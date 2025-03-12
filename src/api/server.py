@@ -23,6 +23,7 @@ from src.agents.base import BaseAgent
 from src.agents.infra import InfrastructureAgent
 from src.agents.architect import ArchitectureAgent
 from src.services.llm import LLMService
+from src.services.vector_db import ChromaService
 
 # Create the FastAPI app
 app = FastAPI(
@@ -71,6 +72,31 @@ class ArchitectureReviewRequest(BaseModel):
     iac_type: str = Field(..., description="Type of IaC (terraform, ansible, jenkins)")
     cloud_provider: str = Field(default="aws", description="Target cloud provider")
 
+class PatternCreate(BaseModel):
+    """Request model for creating a pattern."""
+    name: str = Field(..., description="Name of the pattern")
+    description: str = Field(..., description="Description of the pattern")
+    code: str = Field(..., description="Infrastructure code")
+    cloud_provider: str = Field(default="aws", description="Target cloud provider")
+    iac_type: str = Field(default="terraform", description="IaC type")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
+class PatternUpdate(BaseModel):
+    """Request model for updating a pattern."""
+    name: Optional[str] = Field(None, description="Name of the pattern")
+    description: Optional[str] = Field(None, description="Description of the pattern")
+    code: Optional[str] = Field(None, description="Infrastructure code")
+    cloud_provider: Optional[str] = Field(None, description="Target cloud provider")
+    iac_type: Optional[str] = Field(None, description="IaC type")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+
+class PatternSearchRequest(BaseModel):
+    """Request model for searching patterns."""
+    query: str = Field(..., description="Search query")
+    cloud_provider: Optional[str] = Field(None, description="Filter by cloud provider")
+    iac_type: Optional[str] = Field(None, description="Filter by IaC type")
+    n_results: int = Field(default=5, ge=1, le=20, description="Maximum number of results")
+
 class StatusResponse(BaseModel):
     """Response model for system status requests."""
     status: str = Field(..., description="System status")
@@ -89,21 +115,25 @@ tasks: Dict[str, Dict[str, Any]] = {}
 # System start time
 start_time = datetime.now()
 
-# Create LLM service and agents when the app starts
+# Create services and agents when the app starts
 llm_service = None
+vector_db_service = None
 infrastructure_agent = None
 architecture_agent = None
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize the system on startup."""
-    global llm_service, infrastructure_agent, architecture_agent, architecture_agent
+    global llm_service, vector_db_service, infrastructure_agent, architecture_agent
     
     # Get LLM configuration from environment variables
     llm_provider = os.environ.get("LLM_PROVIDER", "ollama")
-    llm_model = os.environ.get("LLM_MODEL", "llama2")
+    llm_model = os.environ.get("LLM_MODEL", "llama3")
     llm_api_base = os.environ.get("LLM_API_BASE", "http://localhost:11434/api")
     llm_api_key = os.environ.get("LLM_API_KEY")
+    
+    # Get ChromaDB configuration
+    chroma_db_path = os.environ.get("CHROMA_DB_PATH", "/app/chroma_data")
     
     # Create LLM service
     llm_service = LLMService(
@@ -113,26 +143,25 @@ async def startup_event():
         api_key=llm_api_key
     )
     
+    # Create ChromaDB service
+    vector_db_service = ChromaService(config={"db_path": chroma_db_path})
+    
     # Create and register agents
     infrastructure_agent = InfrastructureAgent(
         llm_service=llm_service,
+        vector_db_service=vector_db_service,
         config={"templates_dir": "templates"}
     )
     
     # Initialize architecture agent
     architecture_agent = ArchitectureAgent(
         llm_service=llm_service,
+        vector_db_service=vector_db_service,
         config={"templates_dir": "templates"}
     )
     
-    # Initialize architecture agent
-    architecture_agent = ArchitectureAgent(
-        llm_service=llm_service,
-        config={"templates_dir": "templates"}
-    )
     # Register agents in the global store
     agents["infrastructure"] = infrastructure_agent
-    agents["architecture"] = architecture_agent
     agents["architecture"] = architecture_agent
 
 # ----- API Routes -----
@@ -211,7 +240,7 @@ async def generate_infrastructure(request: InfrastructureRequest):
         "request": request.dict(),
         "result": result,
         "original_code": generated_code,  # Store the original code for reference
-        "improved_code": improved_code,   # Store the improved code
+        "improved_code": improved_code,  # Store the improved code
         "timestamp": datetime.now().isoformat()
     }
     
@@ -272,6 +301,95 @@ async def estimate_costs(request: AnalysisRequest):
     )
     
     return cost_estimate
+
+# ----- Pattern Repository Endpoints -----
+
+@app.post("/patterns", response_model=Dict[str, Any])
+async def create_pattern(pattern: PatternCreate):
+    """Create a new infrastructure pattern."""
+    if not infrastructure_agent:
+        raise HTTPException(status_code=503, detail="Infrastructure agent not initialized")
+    if not infrastructure_agent.vector_db_service:
+        raise HTTPException(status_code=503, detail="Vector DB service not available")
+    
+    # Save the pattern
+    result = await infrastructure_agent.save_pattern(
+        name=pattern.name,
+        description=pattern.description,
+        code=pattern.code,
+        cloud_provider=pattern.cloud_provider,
+        iac_type=pattern.iac_type,
+        metadata=pattern.metadata
+    )
+    
+    return result
+
+@app.get("/patterns/{pattern_id}", response_model=Dict[str, Any])
+async def get_pattern(pattern_id: str):
+    """Get a pattern by ID."""
+    if not infrastructure_agent:
+        raise HTTPException(status_code=503, detail="Infrastructure agent not initialized")
+    if not infrastructure_agent.vector_db_service:
+        raise HTTPException(status_code=503, detail="Vector DB service not available")
+    
+    # Get the pattern
+    pattern = await infrastructure_agent.get_pattern(pattern_id)
+    if not pattern:
+        raise HTTPException(status_code=404, detail=f"Pattern {pattern_id} not found")
+    
+    return pattern
+
+@app.put("/patterns/{pattern_id}", response_model=Dict[str, Any])
+async def update_pattern(pattern_id: str, pattern: PatternUpdate):
+    """Update an existing pattern."""
+    if not infrastructure_agent:
+        raise HTTPException(status_code=503, detail="Infrastructure agent not initialized")
+    if not infrastructure_agent.vector_db_service:
+        raise HTTPException(status_code=503, detail="Vector DB service not available")
+    
+    # Update the pattern
+    result = await infrastructure_agent.update_pattern(
+        pattern_id=pattern_id,
+        name=pattern.name,
+        description=pattern.description,
+        code=pattern.code,
+        cloud_provider=pattern.cloud_provider,
+        iac_type=pattern.iac_type,
+        metadata=pattern.metadata
+    )
+    
+    return result
+
+@app.delete("/patterns/{pattern_id}", response_model=Dict[str, Any])
+async def delete_pattern(pattern_id: str):
+    """Delete a pattern."""
+    if not infrastructure_agent:
+        raise HTTPException(status_code=503, detail="Infrastructure agent not initialized")
+    if not infrastructure_agent.vector_db_service:
+        raise HTTPException(status_code=503, detail="Vector DB service not available")
+    
+    # Delete the pattern
+    result = await infrastructure_agent.delete_pattern(pattern_id)
+    
+    return result
+
+@app.post("/patterns/search", response_model=List[Dict[str, Any]])
+async def search_patterns(request: PatternSearchRequest):
+    """Search for infrastructure patterns."""
+    if not infrastructure_agent:
+        raise HTTPException(status_code=503, detail="Infrastructure agent not initialized")
+    if not infrastructure_agent.vector_db_service:
+        raise HTTPException(status_code=503, detail="Vector DB service not available")
+    
+    # Search for patterns
+    patterns = await infrastructure_agent.find_patterns(
+        query=request.query,
+        cloud_provider=request.cloud_provider,
+        iac_type=request.iac_type,
+        n_results=request.n_results
+    )
+    
+    return patterns
 
 @app.get("/tasks/{task_id}", response_model=Dict[str, Any])
 async def get_task(task_id: str):

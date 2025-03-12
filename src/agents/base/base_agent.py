@@ -8,6 +8,7 @@ It provides common functionality and interfaces for all agents in the system.
 import os
 import time
 import uuid
+import json
 import logging
 from typing import Dict, List, Any, Optional, Callable
 from abc import ABC, abstractmethod
@@ -85,11 +86,45 @@ class BaseAgent(ABC):
             Thoughts and analysis about the input
         """
         self.logger.info(f"Agent {self.name} thinking about task: {input_data.get('task_id', 'unknown')}")
+        
+        # Check for similar past thoughts if vector DB is available
+        similar_thoughts = []
+        if self.vector_db_service:
+            try:
+                # Convert task to a string for searching
+                task_str = input_data.get('task', str(input_data))
+                similar_thoughts = await self.retrieve_similar_memories(
+                    query=task_str, 
+                    n_results=3,
+                    memory_type="thinking"
+                )
+                
+                if similar_thoughts:
+                    self.logger.info(f"Found {len(similar_thoughts)} similar past thoughts")
+            except Exception as e:
+                self.logger.error(f"Error retrieving similar thoughts: {str(e)}")
+        
+        # Prepare context from similar thoughts
+        context = ""
+        if similar_thoughts:
+            context = "Here are some similar tasks I've thought about before:\n\n"
+            for i, memory in enumerate(similar_thoughts):
+                thought_data = memory.get("memory", {})
+                sim_input = thought_data.get("input", {})
+                sim_task = sim_input.get("task", "") if isinstance(sim_input, dict) else ""
+                sim_thoughts = thought_data.get("thoughts", "")
+                
+                if sim_task and sim_thoughts:
+                    context += f"Task {i+1}: {sim_task}\n"
+                    context += f"Thoughts: {sim_thoughts[:300]}...\n\n"
+        
         prompt = f"""
         As {self.name}, an AI agent responsible for {self.description}, 
         think through the following task step by step:
         
         {input_data.get('task', 'No task specified')}
+        
+        {context}
         
         Consider:
         1. What information do I need to complete this task?
@@ -101,7 +136,7 @@ class BaseAgent(ABC):
         """
         
         response = await self.llm_service.generate(prompt)
-        self.update_memory({
+        await self.update_memory({
             "type": "thinking",
             "input": input_data,
             "thoughts": response,
@@ -116,14 +151,20 @@ class BaseAgent(ABC):
         self.state = new_state
         self.last_active_time = time.time()
     
-    def update_memory(self, entry: Dict[str, Any]) -> None:
+    async def update_memory(self, entry: Dict[str, Any]) -> None:
         """Add an entry to the agent's memory."""
         self.memory.append(entry)
         if self.vector_db_service:
-            # If we have a vector DB service, store the memory there as well
             try:
-                self.vector_db_service.store(
-                    text=str(entry),
+                # Convert complex objects to strings for storage
+                memory_text = json.dumps(entry, default=str)
+                memory_id = str(uuid.uuid4())
+                
+                # Store in vector database
+                await self.vector_db_service.store_document(
+                    collection_name="agent_memories",
+                    document_id=memory_id,
+                    text=memory_text,
                     metadata={
                         "agent_id": self.id,
                         "agent_name": self.name,
@@ -131,6 +172,7 @@ class BaseAgent(ABC):
                         "timestamp": entry.get("timestamp", time.time())
                     }
                 )
+                self.logger.info(f"Stored memory in vector DB with ID: {memory_id[:8]}")
             except Exception as e:
                 self.logger.error(f"Failed to store memory in vector DB: {str(e)}")
     
@@ -181,7 +223,7 @@ class BaseAgent(ABC):
             "timestamp": time.time()
         }
         
-        self.update_memory({
+        await self.update_memory({
             "type": "collaboration",
             "collaboration_data": result,
             "timestamp": time.time()
@@ -189,6 +231,58 @@ class BaseAgent(ABC):
         
         self.update_state("idle")
         return result
+    
+    async def retrieve_similar_memories(
+        self, 
+        query: str, 
+        n_results: int = 5,
+        memory_type: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve memories similar to the given query.
+        
+        Args:
+            query: Text to search for similar memories
+            n_results: Maximum number of results to return
+            memory_type: Optional filter for memory type
+            
+        Returns:
+            List of similar memories with metadata
+        """
+        if not self.vector_db_service:
+            return []
+        
+        try:
+            # Build the where clause
+            where = {"agent_id": self.id}
+            if memory_type:
+                where["entry_type"] = memory_type
+            
+            # Query for similar memories
+            results = await self.vector_db_service.query_similar(
+                collection_name="agent_memories",
+                query_text=query,
+                n_results=n_results,
+                where=where
+            )
+            
+            # Parse the memories
+            formatted_results = []
+            for result in results:
+                try:
+                    memory_data = json.loads(result["content"])
+                    formatted_results.append({
+                        "memory": memory_data,
+                        "similarity": result["similarity"],
+                        "metadata": result["metadata"]
+                    })
+                except json.JSONDecodeError:
+                    self.logger.warning(f"Failed to parse memory: {result['content']}")
+            
+            return formatted_results
+        except Exception as e:
+            self.logger.error(f"Error retrieving memories: {str(e)}")
+            return []
     
     def serialize(self) -> Dict[str, Any]:
         """
@@ -205,5 +299,6 @@ class BaseAgent(ABC):
             "state": self.state,
             "creation_time": self.creation_time,
             "last_active_time": self.last_active_time,
-            "memory_size": len(self.memory)
+            "memory_size": len(self.memory),
+            "has_vector_memory": self.vector_db_service is not None
         }

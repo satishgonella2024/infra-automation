@@ -93,6 +93,10 @@ class ChromaService:
         """
         try:
             collection = self.get_collection(collection_name)
+
+            # Ensure metadata is not empty (ChromaDB requirement)
+            if metadata is None or len(metadata) == 0:
+                metadata = {"_default": "true"}  # Default non-empty metadata
             
             # Add document to collection
             collection.add(
@@ -129,11 +133,26 @@ class ChromaService:
         try:
             collection = self.get_collection(collection_name)
             
+            # Process where clause for ChromaDB format
+            where_clause = None
+            if where:
+                # Convert simple dict to Chroma's where format
+                # e.g., {"key": "value"} becomes {"$and": [{"key": {"$eq": "value"}}, ...]}
+                where_conditions = []
+                for key, value in where.items():
+                    where_conditions.append({key: {"$eq": value}})
+                
+                if len(where_conditions) > 0:
+                    if len(where_conditions) == 1:
+                        where_clause = where_conditions[0]
+                    else:
+                        where_clause = {"$and": where_conditions}
+            
             # Query collection
             results = collection.query(
                 query_texts=[query_text],
                 n_results=n_results,
-                where=where
+                where=where_clause
             )
             
             # Format results
@@ -198,6 +217,11 @@ class ChromaService:
         """
         try:
             collection = self.get_collection(collection_name)
+
+            # Ensure metadata is not empty (ChromaDB requirement)
+            if metadata is None or len(metadata) == 0:
+                metadata = {"_default": "true"}  # Default non-empty metadata
+                
             collection.update(
                 ids=[document_id],
                 documents=[text],
@@ -215,8 +239,15 @@ class ChromaService:
             collections = self.client.list_collections()
             return [collection.name for collection in collections]
         except Exception as e:
-            logger.error(f"Error listing collections from ChromaDB: {e}")
-            return []
+            # Handling for ChromaDB v0.6.0+ compatibility
+            try:
+                collections = self.client.list_collections()
+                if isinstance(collections[0], str):
+                    return collections
+                return [collection.name for collection in collections]
+            except Exception as nested_e:
+                logger.error(f"Error listing collections from ChromaDB: {nested_e}")
+                return []
             
     # Pattern-specific methods for API endpoints
     
