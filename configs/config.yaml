@@ -1,0 +1,19 @@
+system:
+  name: "Multi-Agent Infrastructure Automation"
+  version: "0.1.0"
+  
+llm:
+  provider: "ollama"
+  model: "llama3"
+  api_base: "http://192.168.5.199:11434/api"  # Using host's actual IP
+
+agents:
+  max_concurrent: 5
+  timeout_seconds: 300
+
+infrastructure:
+  templates_path: "templates"
+  supported_tools:
+    - "terraform"
+    - "ansible"
+    - "jenkins"

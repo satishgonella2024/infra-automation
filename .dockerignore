@@ -1,0 +1,10 @@
+venv/
+ollama-models/
+vector-db-data/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.git/
+.env
+*.log
