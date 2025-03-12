@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: infra-automation
+  namespace: default
+  labels:
+    app: infra-automation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: infra-automation
+  template:
+    metadata:
+      labels:
+        app: infra-automation
+    spec:
+      containers:
+      - name: infra-automation
+        image: ${DOCKER_REGISTRY}/infra-automation:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        env:
+        - name: LLM_PROVIDER
+          value: "ollama"
+        - name: LLM_MODEL
+          value: "llama2"
+        - name: LLM_API_BASE
+          value: "http://ollama-service:11434"
+        - name: CHROMA_DB_PATH
+          value: "/app/chroma_data"
+        - name: PYTHONPATH
+          value: "/app"
+        volumeMounts:
+        - name: chroma-data
+          mountPath: /app/chroma_data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      volumes:
+      - name: chroma-data
+        persistentVolumeClaim:
+          claimName: chroma-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: infra-automation-service
+  namespace: default
+spec:
+  selector:
+    app: infra-automation
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chroma-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard 

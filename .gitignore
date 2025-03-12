@@ -32,4 +32,5 @@ vector-db-data/
 Thumbs.db
 
 # Backup files
-*.backup 
+*.backup chroma-data/
+chroma_data/

@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Core API service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+      - ./data:/app/data
+    environment:
+      - LLM_PROVIDER=ollama
+      - LLM_MODEL=llama2
+      - LLM_API_BASE=http://ollama:11434/api
+    depends_on:
+      - ollama
+      - vector-db
+    command: ["python", "-m", "src.main", "--mode", "api", "--config", "configs/config.yaml"]
+    networks:
+      - infra-network
+    restart: unless-stopped
+
+  # Ollama LLM service
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama-models:/root/.ollama
+    networks:
+      - infra-network
+    restart: unless-stopped
+    # GPU configuration - Option 1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # GPU configuration - Option 2 (uncomment if Option 1 doesn't work)
+    # environment:
+    #   - NVIDIA_VISIBLE_DEVICES=all
+    # runtime: nvidia
+
+  # Vector database for agent memory
+  vector-db:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./vector-db-data:/qdrant/storage
+    networks:
+      - infra-network
+    restart: unless-stopped
+
+networks:
+  infra-network:
+    driver: bridge

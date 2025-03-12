@@ -1,205 +1,196 @@
 """
-Main Module for Multi-Agent Infrastructure Automation System
+Infrastructure Automation API Service.
 
-This is the entry point for the entire system. It sets up the agents,
-services, and starts the API server.
+This module provides the main FastAPI application for the infrastructure automation service,
+integrating LLM capabilities with vector storage for pattern matching and code generation.
 """
 
 import os
-import sys
-import yaml
 import logging
 import argparse
-import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, List
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-# Import our components
-from src.services.llm.llm_service import LLMService
-from src.agents.infra import InfrastructureAgent
-from src.api.server import app, run_server
+from src.services.llm import LLMService
+from src.services.vector_db import ChromaService
+from src.agents.architect import ArchitectureAgent
 
-# Configure logging
+# Configure logging - use only console logging for tests
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('infra_automation.log')
+        logging.StreamHandler()
     ]
 )
+logger = logging.getLogger(__name__)
 
-logger = logging.getLogger("main")
+# Initialize FastAPI app
+app = FastAPI(
+    title="Infrastructure Automation API",
+    description="API for infrastructure pattern matching and code generation",
+    version="1.0.0"
+)
 
-def load_config(config_path: str) -> Dict[str, Any]:
-    """Load configuration from YAML file."""
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize services
+llm_service = LLMService(
+    provider=os.getenv("LLM_PROVIDER", "ollama"),
+    model=os.getenv("LLM_MODEL", "llama2"),
+    api_base=os.getenv("LLM_API_BASE", "http://localhost:11434")
+)
+vector_db = ChromaService()
+architecture_agent = ArchitectureAgent(llm_service)
+
+# Store services in app state for easier testing
+app.state.llm_service = llm_service
+app.state.vector_db = vector_db
+app.state.architecture_agent = architecture_agent
+
+class InfrastructureRequest(BaseModel):
+    """Request model for infrastructure generation."""
+    task: str
+    requirements: str
+    cloud_provider: str = "aws"
+    iac_type: str = "terraform"
+
+class PatternRequest(BaseModel):
+    """Request model for pattern operations."""
+    name: str
+    description: str
+    cloud_provider: str = "aws"
+    iac_type: str = "terraform"
+    code: str
+    metadata: Dict[str, Any] = {}
+
+@app.post("/infrastructure/generate")
+async def generate_infrastructure(request: InfrastructureRequest):
+    """Generate infrastructure code based on requirements."""
     try:
-        with open(config_path, 'r') as f:
-            return yaml.safe_load(f)
+        # Search for similar patterns
+        patterns = await app.state.vector_db.search_patterns(
+            query=request.requirements,
+            cloud_provider=request.cloud_provider,
+            iac_type=request.iac_type,
+            n_results=3
+        )
+        
+        # Process the request using the architecture agent
+        result = await app.state.architecture_agent.process({
+            "task_id": "generate_infra",
+            "code": "",  # Initial empty code to be generated
+            "cloud_provider": request.cloud_provider,
+            "iac_type": request.iac_type,
+            "requirements": request.requirements,
+            "task": request.task,
+            "similar_patterns": patterns
+        })
+        
+        return {"success": True, "result": result}
     except Exception as e:
-        logger.error(f"Failed to load config from {config_path}: {str(e)}")
-        return {}
+        logger.error(f"Error generating infrastructure: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-async def setup_system(config: Dict[str, Any]):
-    """Set up the system components based on configuration."""
-    logger.info("Setting up multi-agent infrastructure automation system...")
-    
-    # Extract LLM configuration, prioritizing environment variables
-    llm_config = config.get("llm", {})
-    llm_provider = os.environ.get("LLM_PROVIDER") or llm_config.get("provider", "ollama")
-    llm_model = os.environ.get("LLM_MODEL") or llm_config.get("model", "llama2")
-    llm_api_base = os.environ.get("LLM_API_BASE") or llm_config.get("api_base", "http://localhost:11434/api")
-    llm_api_key = os.environ.get("LLM_API_KEY") or llm_config.get("api_key")
-    
-    # Log the actual configuration being used
-    logger.info(f"Using LLM configuration - provider: {llm_provider}, model: {llm_model}, api_base: {llm_api_base}")
-    
-    # Create LLM service
-    logger.info(f"Initializing LLM service with provider: {llm_provider}, model: {llm_model}")
-    llm_service = LLMService(
-        provider=llm_provider,
-        model=llm_model,
-        api_base=llm_api_base,
-        api_key=llm_api_key,
-        config=llm_config
-    )
-    
-    # Create agents
-    logger.info("Initializing agents...")
-    infrastructure_agent = InfrastructureAgent(
-        llm_service=llm_service,
-        config=config.get("infrastructure", {})
-    )
-    
-    # In a real implementation, we would also initialize other agents here:
-    # - SecurityAgent
-    # - ArchitectAgent
-    # - MonitoringAgent
-    # etc.
-    
-    logger.info("System setup complete!")
-    
-    return {
-        "llm_service": llm_service,
-        "infrastructure_agent": infrastructure_agent
-    }
+@app.post("/patterns")
+async def add_pattern(pattern: PatternRequest):
+    """Add a new infrastructure pattern."""
+    try:
+        result = await app.state.vector_db.add_pattern({
+            "name": pattern.name,
+            "description": pattern.description,
+            "cloud_provider": pattern.cloud_provider,
+            "iac_type": pattern.iac_type,
+            "code": pattern.code,
+            "metadata": pattern.metadata
+        })
+        return {"success": True, "pattern_id": result["id"]}
+    except Exception as e:
+        logger.error(f"Error adding pattern: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-def parse_args():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Multi-Agent Infrastructure Automation System")
-    parser.add_argument(
-        "--config", 
-        type=str, 
-        default="configs/config.yaml",
-        help="Path to configuration YAML file"
-    )
-    parser.add_argument(
-        "--mode",
-        type=str,
-        choices=["api", "cli"],
-        default="api",
-        help="Run mode (api server or cli)"
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=8000,
-        help="Port for API server"
-    )
-    return parser.parse_args()
+@app.get("/patterns/search")
+async def search_patterns(
+    query: str, 
+    cloud_provider: str = None, 
+    iac_type: str = None, 
+    n_results: int = 5
+):
+    """Search for infrastructure patterns."""
+    try:
+        patterns = await app.state.vector_db.search_patterns(
+            query=query, 
+            cloud_provider=cloud_provider, 
+            iac_type=iac_type, 
+            n_results=n_results
+        )
+        return {"success": True, "patterns": patterns}
+    except Exception as e:
+        logger.error(f"Error searching patterns: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-async def cli_mode(components):
-    """Run the system in CLI mode for testing."""
-    logger.info("Starting CLI mode...")
-    
-    infra_agent = components["infrastructure_agent"]
-    
-    # Simple CLI loop for testing
-    print("\nWelcome to Multi-Agent Infrastructure Automation System CLI")
-    print("Type 'exit' to quit")
-    
-    while True:
-        command = input("\nEnter command (generate, analyze, cost, exit): ").strip().lower()
-        
-        if command == "exit":
-            break
-        
-        if command == "generate":
-            task = input("Enter infrastructure task description: ")
-            cloud = input("Cloud provider (aws, azure, gcp) [aws]: ") or "aws"
-            iac_type = input("IaC type (terraform, ansible, jenkins) [terraform]: ") or "terraform"
-            
-            print("\nProcessing request...")
-            result = await infra_agent.process({
-                "task_id": "cli-test",
-                "task": task,
-                "requirements": {},
-                "cloud_provider": cloud,
-                "iac_type": iac_type
-            })
-            
-            print("\n--- Generated Code ---\n")
-            print(result["code"])
-            print("\n--- Metadata ---\n")
-            print(result["metadata"])
-        
-        elif command == "analyze":
-            code = input("Enter or paste infrastructure code (end with 'EOF' on a new line):\n")
-            lines = []
-            while True:
-                line = input()
-                if line.strip() == "EOF":
-                    break
-                lines.append(line)
-            
-            code = "\n".join(lines)
-            iac_type = input("IaC type (terraform, ansible, jenkins) [terraform]: ") or "terraform"
-            
-            print("\nAnalyzing code...")
-            analysis = await infra_agent.analyze_infrastructure(code, iac_type)
-            
-            print("\n--- Analysis Results ---\n")
-            print(analysis)
-        
-        elif command == "cost":
-            code = input("Enter or paste infrastructure code (end with 'EOF' on a new line):\n")
-            lines = []
-            while True:
-                line = input()
-                if line.strip() == "EOF":
-                    break
-                lines.append(line)
-            
-            code = "\n".join(lines)
-            iac_type = input("IaC type (terraform, ansible, jenkins) [terraform]: ") or "terraform"
-            cloud = input("Cloud provider (aws, azure, gcp) [aws]: ") or "aws"
-            
-            print("\nEstimating costs...")
-            costs = await infra_agent.estimate_costs(code, iac_type, cloud)
-            
-            print("\n--- Cost Estimation ---\n")
-            print(costs)
-        
-        else:
-            print(f"Unknown command: {command}")
+@app.put("/patterns/{pattern_id}")
+async def update_pattern(pattern_id: str, pattern: PatternRequest):
+    """Update an existing infrastructure pattern."""
+    try:
+        result = await app.state.vector_db.update_pattern(
+            pattern_id,
+            {
+                "name": pattern.name,
+                "description": pattern.description,
+                "cloud_provider": pattern.cloud_provider,
+                "iac_type": pattern.iac_type,
+                "code": pattern.code,
+                "metadata": pattern.metadata
+            }
+        )
+        return {"success": True, "pattern_id": result["id"]}
+    except Exception as e:
+        logger.error(f"Error updating pattern: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-async def main():
+@app.delete("/patterns/{pattern_id}")
+async def delete_pattern(pattern_id: str):
+    """Delete an infrastructure pattern."""
+    try:
+        result = await app.state.vector_db.delete_pattern(pattern_id)
+        return {"success": True, "pattern_id": result["id"]}
+    except Exception as e:
+        logger.error(f"Error deleting pattern: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "services": {
+        "llm": "healthy",
+        "vector_db": "healthy"
+    }}
+
+def main():
     """Main entry point for the application."""
-    args = parse_args()
+    parser = argparse.ArgumentParser(description="Infrastructure Automation Service")
+    parser.add_argument("--mode", choices=["api"], default="api", help="Service mode")
+    parser.add_argument("--config", type=str, help="Path to config file")
+    args = parser.parse_args()
     
-    # Load configuration
-    config = load_config(args.config)
-    
-    # Set up the system
-    components = await setup_system(config)
-    
-    # Run in the appropriate mode
     if args.mode == "api":
-        # Start the API server
-        logger.info(f"Starting API server on port {args.port}...")
-        run_server()
-    elif args.mode == "cli":
-        # Run CLI mode for testing
-        await cli_mode(components)
+        import uvicorn
+        uvicorn.run(
+            "src.main:app",
+            host="0.0.0.0",
+            port=8000,
+            reload=True
+        )
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

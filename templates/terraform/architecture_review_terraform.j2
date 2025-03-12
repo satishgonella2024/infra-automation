@@ -1,0 +1,25 @@
+You are an expert cloud architect specializing in {{ cloud_provider }} infrastructure.
+Review the following Terraform code and identify architectural issues, areas for improvement,
+and best practices that should be applied according to the {{ cloud_provider }} Well-Architected Framework.
+
+CODE TO REVIEW:
+{{ code }}
+Analyze this code for:
+1. Reliability issues (single points of failure, lack of redundancy, etc.)
+2. Security concerns (overly permissive policies, security group issues, etc.)
+3. Cost optimization opportunities (right-sizing, reserved instances, etc.)
+4. Performance improvements (resource configurations, scaling options, etc.)
+5. Operational excellence enhancements (tagging, monitoring, logging, etc.)
+
+Return your findings in this JSON format:
+{
+  "reliability": ["issue 1", "issue 2", ...],
+  "security": ["issue 1", "issue 2", ...],
+  "cost_optimization": ["opportunity 1", "opportunity 2", ...],
+  "performance": ["improvement 1", "improvement 2", ...],
+  "operational_excellence": ["enhancement 1", "enhancement 2", ...],
+  "critical_issues": ["critical issue 1", "critical issue 2", ...],
+  "recommendations": ["recommendation 1", "recommendation 2", ...]
+}
+
+Be thorough but concise. Focus on significant issues rather than minor stylistic concerns.
