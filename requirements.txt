@@ -13,6 +13,7 @@ langchain>=0.0.201
 jinja2>=3.1.2
 
 # Vector database connections
+chromadb==0.6.3
 qdrant-client>=1.2.0
 faiss-cpu>=1.7.4
 
@@ -29,3 +30,5 @@ flake8>=6.0.0
 # Utilities
 tqdm>=4.65.0
 rich>=13.3.5
+python-multipart>=0.0.6  # For FastAPI file uploads
+httpx>=0.24.0  # For async HTTP client

@@ -29,4 +29,7 @@ vector-db-data/
 
 # System
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Backup files
+*.backup 

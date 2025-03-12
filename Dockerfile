@@ -2,29 +2,32 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install only essential system dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    git \
-    curl \
-    && apt-get clean \
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy only the requirements file first to leverage Docker cache
+# Copy requirements file
 COPY requirements.txt .
+
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code, excluding venv and other large directories
-COPY src/ ./src/
-COPY configs/ ./configs/
-COPY templates/ ./templates/
-# Remove the COPY *.py line since there are no Python files in the root directory
+# Copy application code
+COPY . .
 
-# Create necessary directories
-RUN mkdir -p data logs
+# Create directory for ChromaDB data
+RUN mkdir -p /app/chroma_data && chmod 777 /app/chroma_data
 
-# Expose the port the app runs on
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV LLM_PROVIDER=ollama
+ENV LLM_MODEL=llama3
+ENV LLM_API_BASE=http://ollama:11434
+ENV CHROMA_DB_PATH=/app/chroma_data
+
+# Expose the API port
 EXPOSE 8000
 
-# Command to run the application
-CMD ["python", "-m", "src.main", "--mode", "api", "--config", "configs/config.yaml"]
+# Run the application
+CMD ["python", "-m", "src.main"]

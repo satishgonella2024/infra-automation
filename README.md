@@ -1,53 +1,23 @@
-# Infrastructure Automation with GPU-Accelerated LLM
+# Infrastructure Automation
 
-A sophisticated infrastructure automation platform leveraging GPU-accelerated LLM (Llama 3 8B) to generate, validate, and manage cloud infrastructure with a focus on security and compliance.
+This project provides an API service for automating infrastructure generation using LLMs.
 
-## System Architecture
+## Features
 
-### Core Components
+- Generate infrastructure code (Terraform, CloudFormation, etc.) from natural language descriptions
+- Analyze existing infrastructure for security, cost, and performance improvements
+- Provide recommendations for infrastructure optimization
+- Support for multiple cloud providers (AWS, Azure, GCP)
 
-- **GPU-Accelerated LLM Service**
-  - Model: Meta-Llama-3-8B-Instruct (8.03B parameters)
-  - Quantization: Q4_0 (4.33 GiB)
-  - Context Length: 8192 tokens
-  - Batch Size: 512
-  - GPU Layers: All 33 layers offloaded
+## Setup
 
-- **Memory Management**
-  - Model Buffer: 4155.99 MiB
-  - KV Cache: 1024.00 MiB
-  - Compute Buffer: 560.00 MiB
-  - Total GPU Usage: ~6GB of 16GB
+### Prerequisites
 
-- **API Layer**
-  - Framework: GIN
-  - Response Times: 2.5s - 18.3s
-  - Parallel Processing: 4 concurrent requests
+- Docker and Docker Compose
+- Python 3.10+
+- Ollama (for local LLM support)
 
-### Performance Characteristics
-
-- **GPU Utilization**
-  - Peak: 75%
-  - Temperature Range: 34-47°C
-  - Power Usage: 7W-193W (320W capacity)
-  - Memory Usage: 6048 MiB / 16376 MiB
-
-- **Model Configuration**
-  - Embedding Length: 4096
-  - Feed Forward Length: 14336
-  - Attention Heads: 32 (8 KV heads)
-  - GQA: 4
-  - RoPE Base: 500000.0
-
-## Requirements
-
-- NVIDIA GPU with Compute Capability 8.9+
-- CUDA 12.4+
-- 16GB+ GPU Memory
-- Docker & Docker Compose
-- Python 3.8+
-
-## Installation
+### Installation
 
 1. Clone the repository:
    ```bash
@@ -55,12 +25,12 @@ A sophisticated infrastructure automation platform leveraging GPU-accelerated LL
    cd infra-automation
    ```
 
-2. Set up the environment:
+2. Install dependencies:
    ```bash
-   ./setup.sh
+   pip install -r requirements.txt
    ```
 
-3. Configure environment variables:
+3. Set up environment variables:
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
@@ -75,30 +45,70 @@ A sophisticated infrastructure automation platform leveraging GPU-accelerated LL
 
 ### API Endpoints
 
-- `POST /api/generate`
-  ```json
-  {
-    "task": "Create an AWS EKS cluster",
+- `GET /health`: Check if the API is running
+- `POST /infrastructure/generate`: Generate infrastructure code
+- `POST /infrastructure/analyze`: Analyze existing infrastructure
+
+### Example
+
+```bash
+curl -X POST http://localhost:8000/infrastructure/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "task": "Create an S3 bucket with versioning enabled",
+    "requirements": "The bucket should be secure and have versioning enabled",
     "cloud_provider": "aws",
     "iac_type": "terraform"
-  }
-  ```
+  }'
+```
 
-### Example Requests
+## Testing
 
-1. Generate EKS Cluster:
-   ```bash
-   curl -X POST http://localhost:8000/api/generate \
-     -H "Content-Type: application/json" \
-     -d '{"task": "Create a highly available EKS cluster", "cloud_provider": "aws", "iac_type": "terraform"}'
-   ```
+### Unit Tests
 
-2. Generate RDS Aurora Cluster:
-   ```bash
-   curl -X POST http://localhost:8000/api/generate \
-     -H "Content-Type: application/json" \
-     -d '{"task": "Create an Aurora PostgreSQL cluster with 2 read replicas", "cloud_provider": "aws", "iac_type": "terraform"}'
-   ```
+Run the unit tests with:
+
+```bash
+pytest src/tests/test_unit.py
+```
+
+### Integration Tests
+
+Run the integration tests with:
+
+```bash
+./run_integration_tests.sh
+```
+
+This script will:
+1. Check if Ollama is running and the required model is available
+2. Start the API service using Docker Compose
+3. Run the integration tests
+4. Run the infrastructure generation tests
+5. Clean up the services
+
+### Infrastructure Generation Tests
+
+The infrastructure generation tests verify that the API can generate valid infrastructure code for various scenarios. These tests are included in the integration test suite, but can also be run separately:
+
+```bash
+python run_tests.py
+```
+
+The test runner will execute each test individually and provide a summary of the results. The tests include:
+
+- Basic S3 bucket creation
+- EC2 instance with security groups
+- EKS cluster with node groups
+- VPC with subnets
+- RDS database with encryption
+
+### CI/CD Integration
+
+The tests are integrated with GitHub Actions workflows defined in `.github/workflows/test.yml`. The workflow includes:
+
+- Unit tests job
+- Integration tests job that sets up Ollama, pulls the required model, and runs the tests
 
 ## Development
 
@@ -107,35 +117,24 @@ A sophisticated infrastructure automation platform leveraging GPU-accelerated LL
 ```
 infra-automation/
 ├── src/
-│   ├── agents/          # Multi-agent system components
-│   ├── services/        # Core services (LLM, Vector DB)
-│   ├── models/          # Data models and schemas
-│   └── utils/           # Helper utilities
-├── configs/             # Configuration files
-├── tests/               # Test suites
-└── docker/             # Docker configurations
+│   ├── api/
+│   ├── infrastructure/
+│   ├── llm/
+│   ├── tests/
+│   └── utils/
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+└── README.md
 ```
 
-### Running Tests
-
-```bash
-python -m pytest tests/
-```
-
-## Performance Monitoring
-
-Monitor GPU usage:
-```bash
-nvidia-smi -l 1
-```
-
-## Contributing
+### Contributing
 
 1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Run tests
+5. Submit a pull request
 
 ## License
 
