@@ -9,8 +9,9 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./src:/app/src
-      - chroma_data:/app/chroma_data
+      - ./src:/app/src:delegated
+      - chroma_data:/app/chroma_data:delegated
+      - ./data:/app/data:delegated
     environment:
       - LLM_PROVIDER=ollama
       - LLM_MODEL=llama3
@@ -34,6 +35,8 @@ services:
     build:
       context: ./ui/react-ui
       dockerfile: Dockerfile
+    image: infra-automation-react-ui
+    container_name: infra-automation-react-ui
     ports:
       - "80:80"
     depends_on:
@@ -42,7 +45,7 @@ services:
       - infra_network
     restart: unless-stopped
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_API_URL=http://192.168.5.199:8000
 
   # Test service for running automated tests
   test:

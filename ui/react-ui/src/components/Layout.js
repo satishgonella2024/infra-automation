@@ -35,7 +35,8 @@ import {
   AccountCircle,
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
-  ChevronLeft as ChevronLeftIcon
+  ChevronLeft as ChevronLeftIcon,
+  Money as MoneyIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 240;
@@ -74,6 +75,7 @@ function Layout({ children, apiStatus }) {
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Infrastructure Generator', icon: <CodeIcon />, path: '/generate' },
     { text: 'Security Review', icon: <SecurityIcon />, path: '/security' },
+    { text: 'Cost Optimization', icon: <MoneyIcon />, path: '/cost-optimization' },
     { text: 'Task History', icon: <HistoryIcon />, path: '/tasks' },
     { text: 'Visualization', icon: <VisibilityIcon />, path: '/visualization' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },

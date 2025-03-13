@@ -11,6 +11,7 @@ import aiohttp
 import logging
 import asyncio
 from typing import Dict, List, Any, Optional, Union
+from datetime import datetime
 
 class LLMService:
     """
@@ -40,6 +41,9 @@ class LLMService:
         self.model = model
         self.api_key = api_key
         self.config = config or {}
+        self.request_count = 0
+        self.last_request_time = None
+        self.total_tokens_used = 0
         
         # Configure logging
         self.logger = logging.getLogger(f"service.llm.{self.provider}")
@@ -59,6 +63,13 @@ class LLMService:
             raise ValueError(f"Unsupported provider: {provider}")
         
         self.logger.info(f"Using API base URL: {self.api_base}")
+    
+    async def _track_request(self, tokens_used: Optional[int] = None):
+        """Track request metrics."""
+        self.request_count += 1
+        self.last_request_time = datetime.now()
+        if tokens_used:
+            self.total_tokens_used += tokens_used
     
     async def generate(
         self, 
@@ -145,201 +156,12 @@ class LLMService:
                         return f"Error: Ollama API returned status {response.status}"
                     
                     response_data = await response.json()
+                    # Track the request
+                    await self._track_request(response_data.get('total_duration'))
                     return response_data.get("response", "")
         except Exception as e:
             self.logger.error(f"Error calling Ollama API: {str(e)}")
-            
-            # For testing purposes, return a mock response
-            self.logger.warning("Returning mock response for testing purposes")
-            if "eks" in prompt.lower() or "kubernetes" in prompt.lower():
-                return """
-                Here's a Terraform configuration for a highly available EKS cluster with 3 availability zones, node groups with autoscaling, and proper IAM roles:
-
-                ```
-                provider "aws" {
-                  region = "us-west-2"
-                }
-
-                # VPC and Networking
-                module "vpc" {
-                  source = "terraform-aws-modules/vpc/aws"
-                  version = "3.14.0"
-
-                  name = "eks-vpc"
-                  cidr = "10.0.0.0/16"
-
-                  azs             = ["us-west-2a", "us-west-2b", "us-west-2c"]
-                  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-                  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
-
-                  enable_nat_gateway = true
-                  single_nat_gateway = false
-                  one_nat_gateway_per_az = true
-
-                  enable_dns_hostnames = true
-                  enable_dns_support   = true
-
-                  public_subnet_tags = {
-                    "kubernetes.io/cluster/my-eks-cluster" = "shared"
-                    "kubernetes.io/role/elb"               = "1"
-                  }
-
-                  private_subnet_tags = {
-                    "kubernetes.io/cluster/my-eks-cluster" = "shared"
-                    "kubernetes.io/role/internal-elb"      = "1"
-                  }
-                }
-
-                # IAM Role for EKS Cluster
-                resource "aws_iam_role" "eks_cluster_role" {
-                  name = "eks-cluster-role"
-
-                  assume_role_policy = jsonencode({
-                    Version = "2012-10-17"
-                    Statement = [
-                      {
-                        Action = "sts:AssumeRole"
-                        Effect = "Allow"
-                        Principal = {
-                          Service = "eks.amazonaws.com"
-                        }
-                      }
-                    ]
-                  })
-                }
-
-                resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
-                  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
-                  role       = aws_iam_role.eks_cluster_role.name
-                }
-
-                # IAM Role for Node Group
-                resource "aws_iam_role" "eks_node_role" {
-                  name = "eks-node-role"
-
-                  assume_role_policy = jsonencode({
-                    Version = "2012-10-17"
-                    Statement = [
-                      {
-                        Action = "sts:AssumeRole"
-                        Effect = "Allow"
-                        Principal = {
-                          Service = "ec2.amazonaws.com"
-                        }
-                      }
-                    ]
-                  })
-                }
-
-                resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
-                  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-                  role       = aws_iam_role.eks_node_role.name
-                }
-
-                resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
-                  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-                  role       = aws_iam_role.eks_node_role.name
-                }
-
-                resource "aws_iam_role_policy_attachment" "ecr_read_only" {
-                  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-                  role       = aws_iam_role.eks_node_role.name
-                }
-
-                # EKS Cluster
-                resource "aws_eks_cluster" "main" {
-                  name     = "my-eks-cluster"
-                  role_arn = aws_iam_role.eks_cluster_role.arn
-                  version  = "1.24"
-
-                  vpc_config {
-                    subnet_ids = module.vpc.private_subnets
-                    endpoint_private_access = true
-                    endpoint_public_access  = true
-                  }
-
-                  depends_on = [
-                    aws_iam_role_policy_attachment.eks_cluster_policy
-                  ]
-                }
-
-                # EKS Node Group
-                resource "aws_eks_node_group" "main" {
-                  cluster_name    = aws_eks_cluster.main.name
-                  node_group_name = "main-node-group"
-                  node_role_arn   = aws_iam_role.eks_node_role.arn
-                  subnet_ids      = module.vpc.private_subnets
-
-                  scaling_config {
-                    desired_size = 3
-                    max_size     = 6
-                    min_size     = 3
-                  }
-
-                  instance_types = ["t3.medium"]
-
-                  # Enable auto-scaling
-                  capacity_type = "ON_DEMAND"
-
-                  # Ensure that IAM Role permissions are created before and deleted after EKS Node Group handling
-                  depends_on = [
-                    aws_iam_role_policy_attachment.eks_worker_node_policy,
-                    aws_iam_role_policy_attachment.eks_cni_policy,
-                    aws_iam_role_policy_attachment.ecr_read_only,
-                  ]
-
-                  tags = {
-                    Environment = "production"
-                    Terraform   = "true"
-                  }
-                }
-
-                # Auto Scaling Policy
-                resource "aws_autoscaling_policy" "eks_autoscaling_policy" {
-                  name                   = "eks-autoscaling-policy"
-                  policy_type            = "TargetTrackingScaling"
-                  estimated_instance_warmup = 300
-                  
-                  # This assumes you have the ASG name from the node group
-                  # You may need to use a data source to get this in a real scenario
-                  autoscaling_group_name = aws_eks_node_group.main.resources[0].autoscaling_groups[0].name
-
-                  target_tracking_configuration {
-                    predefined_metric_specification {
-                      predefined_metric_type = "ASGAverageCPUUtilization"
-                    }
-                    target_value = 70.0
-                  }
-
-                  depends_on = [aws_eks_node_group.main]
-                }
-
-                # Outputs
-                output "cluster_endpoint" {
-                  description = "Endpoint for EKS control plane"
-                  value       = aws_eks_cluster.main.endpoint
-                }
-
-                output "cluster_security_group_id" {
-                  description = "Security group ID attached to the EKS cluster"
-                  value       = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
-                }
-
-                output "cluster_name" {
-                  description = "Kubernetes Cluster Name"
-                  value       = aws_eks_cluster.main.name
-                }
-                ```
-
-                This configuration creates:
-                1. A VPC with public and private subnets across 3 availability zones
-                2. Proper IAM roles for the EKS cluster and node groups
-                3. An EKS cluster with private endpoint access
-                4. A managed node group with auto-scaling capabilities
-                5. Auto-scaling policies based on CPU utilization
-                """
-            else:
-                return "Error: Could not connect to Ollama API. Please ensure the Ollama service is running."
+            return f"Error: Could not connect to Ollama API. Please ensure the Ollama service is running."
     
     async def _generate_openai(
         self, 

@@ -52,11 +52,11 @@ class BaseAgent(ABC):
         self.llm_service = llm_service
         self.vector_db_service = vector_db_service
         self.config = config or {}
-        self.logger = logging.getLogger(f"agent.{name}")
-        self.state = "idle"
-        self.memory: List[Dict[str, Any]] = []
+        self.memory = []
         self.creation_time = time.time()
-        self.last_active_time = self.creation_time
+        self.last_active_time = time.time()
+        self.state = "idle"  # Initialize state as idle
+        self.logger = logging.getLogger(f"agent.{name}")
         
     def __str__(self) -> str:
         """String representation of the agent."""
@@ -146,10 +146,21 @@ class BaseAgent(ABC):
         return {"thoughts": response, "agent": self.name}
     
     def update_state(self, new_state: str) -> None:
-        """Update the agent's state."""
-        self.logger.info(f"Agent {self.name} state change: {self.state} -> {new_state}")
+        """
+        Update the agent's state.
+        
+        Args:
+            new_state: The new state to set
+        """
+        valid_states = ["idle", "processing", "error"]
+        if new_state not in valid_states:
+            self.logger.warning(f"Invalid state: {new_state}. Using 'idle' instead.")
+            new_state = "idle"
+        
+        old_state = self.state
         self.state = new_state
         self.last_active_time = time.time()
+        self.logger.info(f"Agent {self.name} state change: {old_state} -> {new_state}")
     
     async def update_memory(self, entry: Dict[str, Any]) -> None:
         """Add an entry to the agent's memory."""
@@ -300,5 +311,6 @@ class BaseAgent(ABC):
             "creation_time": self.creation_time,
             "last_active_time": self.last_active_time,
             "memory_size": len(self.memory),
-            "has_vector_memory": self.vector_db_service is not None
+            "has_vector_memory": self.vector_db_service is not None,
+            "status": "online" if self.state == "idle" else self.state  # Add explicit status field
         }

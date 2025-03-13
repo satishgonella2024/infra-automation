@@ -9,6 +9,8 @@ import TaskHistory from './pages/TaskHistory';
 import Visualization from './pages/Visualization';
 import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
+import CostOptimization from './pages/CostOptimization';
+import TerraformModules from './pages/TerraformModules';
 import { fetchStatus } from './services/api';
 
 function App() {
@@ -23,12 +25,20 @@ function App() {
     const checkApiStatus = async () => {
       try {
         const status = await fetchStatus();
-        setApiStatus(status);
+        // Ensure we have a valid status object
+        setApiStatus({
+          status: status.status || 'offline',
+          agents: Array.isArray(status.agents) ? status.agents : [],
+          uptime_seconds: status.uptime_seconds || 0,
+          version: status.version || '0.0.0'
+        });
       } catch (error) {
         console.error('Failed to fetch API status:', error);
         setApiStatus({
           status: 'offline',
-          agents: []
+          agents: [],
+          uptime_seconds: 0,
+          version: '0.0.0'
         });
       } finally {
         setLoading(false);
@@ -36,6 +46,7 @@ function App() {
     };
 
     checkApiStatus();
+    // Poll for status updates every 10 seconds
     const interval = setInterval(checkApiStatus, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -77,6 +88,8 @@ function App() {
           <Route path="/tasks" element={<TaskHistory />} />
           <Route path="/visualization" element={<Visualization />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/cost-optimization" element={<CostOptimization />} />
+          <Route path="/terraform-modules" element={<TerraformModules />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Box>

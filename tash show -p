@@ -1,0 +1,13 @@
+[1mdiff --git a/ui/react-ui/Dockerfile b/ui/react-ui/Dockerfile[m
+[1mindex 3e6e866..62e0c41 100644[m
+[1m--- a/ui/react-ui/Dockerfile[m
+[1m+++ b/ui/react-ui/Dockerfile[m
+[36m@@ -4,7 +4,7 @@[m [mFROM node:18-slim as build[m
+ WORKDIR /app[m
+ [m
+ COPY package*.json ./[m
+[31m-RUN npm install[m
+[32m+[m[32mRUN npm install --legacy-peer-deps[m
+ [m
+ COPY . .[m
+ RUN npm run build[m
