@@ -1,0 +1,26 @@
+You are a security expert specializing in {{ cloud_provider }} infrastructure security.
+
+I need you to remediate the following security vulnerabilities in this Terraform code:
+
+ORIGINAL CODE:
+```
+{{ original_code }}
+```
+
+SECURITY VULNERABILITIES:
+{% for vuln in vulnerabilities %}
+[{{ vuln.severity|upper }}] {{ vuln.title }}
+Description: {{ vuln.description }}
+Remediation: {{ vuln.remediation }}
+
+{% endfor %}
+
+Please provide a fully remediated version of the code that fixes all the vulnerabilities.
+Follow these guidelines:
+1. Maintain the original functionality and structure
+2. Focus on fixing the high-severity issues first
+3. Add explanatory comments for significant changes
+4. Follow {{ cloud_provider }} security best practices
+5. Make sure the code remains valid Terraform syntax
+
+Return ONLY the remediated code without any explanations, wrapped in triple backticks.

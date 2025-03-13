@@ -6,7 +6,7 @@ This module provides functions for loading and rendering templates.
 
 import os
 import re
-from typing import Optional
+from typing import Optional, Dict, Any
 from jinja2 import Environment, FileSystemLoader, Template
 
 # Initialize Jinja2 environment
@@ -28,6 +28,20 @@ def load_template(template_name: str) -> Template:
         Jinja2 Template object
     """
     return env.get_template(template_name)
+
+def render_template(template_name: str, **context: Dict[str, Any]) -> str:
+    """
+    Load and render a Jinja2 template with the given context.
+    
+    Args:
+        template_name: Name of the template file
+        **context: Variables to pass to the template
+        
+    Returns:
+        Rendered template as a string
+    """
+    template = load_template(template_name)
+    return template.render(**context)
 
 def extract_code_from_text(text: str) -> Optional[str]:
     """

@@ -30,4 +30,4 @@ ENV CHROMA_DB_PATH=/app/chroma_data
 EXPOSE 8000
 
 # Run the application
-CMD ["python", "-m", "src.main"]
+CMD ["python", "-m", "src.api.server"]

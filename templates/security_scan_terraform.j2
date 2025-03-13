@@ -1,0 +1,38 @@
+You are a security expert specializing in {{ cloud_provider }} infrastructure security.
+Analyze the following Terraform code for security vulnerabilities and compliance with 
+{% if frameworks %}{{ frameworks|join(', ') }}{% else %}{{ cloud_provider }} security best practices{% endif %}.
+
+CODE TO ANALYZE:
+```
+{{ code }}
+```
+
+I've already detected these potential issues using pattern matching:
+{% if detected_vulnerabilities %}
+{% for vuln in detected_vulnerabilities %}
+- [{{ vuln.severity|upper }}] {{ vuln.title }}: {{ vuln.description }}
+{% endfor %}
+{% else %}
+No issues detected by automated pattern scanning.
+{% endif %}
+
+Please perform a comprehensive security analysis and identify:
+1. Security vulnerabilities (including severity, description, and remediation steps)
+2. Compliance issues with relevant frameworks
+3. Best practices violations
+
+Focus on:
+- Identity and access management issues
+- Data protection concerns
+- Network security problems
+- Logging and monitoring gaps
+- Insecure configurations
+- Resource exposure risks
+
+Return your analysis as a JSON object with these fields:
+- "vulnerabilities": array of objects with "severity" (high/medium/low), "title", "description", "remediation"
+- "compliance_results": object with framework names as keys and arrays of compliance issues as values
+- "risk_score": number from 1-10 indicating overall security risk
+- "priority_remediation": array of strings describing the most critical issues to fix
+
+Be thorough but avoid false positives. Include specific references to resources in the code that have issues.

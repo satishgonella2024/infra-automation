@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from src.agents.base import BaseAgent
 from src.agents.infra import InfrastructureAgent
 from src.agents.architect import ArchitectureAgent
+from src.agents.security import SecurityAgent
 from src.services.llm import LLMService
 from src.services.vector_db import ChromaService
 
@@ -57,6 +58,7 @@ class InfrastructureResponse(BaseModel):
     metadata: Dict[str, Any] = Field(..., description="Metadata about the generated code")
     thoughts: str = Field(..., description="Agent's thought process")
     architecture_findings: Dict[str, Any] = Field(default_factory=dict, description="Architecture review findings")
+    security_findings: Dict[str, Any] = Field(default_factory=dict, description="Security review findings")
     iac_type: str = Field(..., description="Type of IaC that was generated")
     cloud_provider: str = Field(..., description="Target cloud provider")
 
@@ -104,6 +106,13 @@ class StatusResponse(BaseModel):
     uptime_seconds: int = Field(..., description="System uptime in seconds")
     version: str = Field(..., description="System version")
 
+class SecurityReviewRequest(BaseModel):
+    """Request model for security review."""
+    infrastructure_code: str = Field(..., description="Infrastructure code to review")
+    iac_type: str = Field(..., description="Type of IaC (terraform, ansible, jenkins)")
+    cloud_provider: str = Field(default="aws", description="Target cloud provider")
+    compliance_framework: Optional[str] = Field(None, description="Specific compliance framework to check against")
+
 # ----- Globals and initialization -----
 
 # Store for our agents
@@ -120,11 +129,12 @@ llm_service = None
 vector_db_service = None
 infrastructure_agent = None
 architecture_agent = None
+security_agent = None  # Add security agent variable
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize the system on startup."""
-    global llm_service, vector_db_service, infrastructure_agent, architecture_agent
+    global llm_service, vector_db_service, infrastructure_agent, architecture_agent, security_agent
     
     # Get LLM configuration from environment variables
     llm_provider = os.environ.get("LLM_PROVIDER", "ollama")
@@ -160,9 +170,17 @@ async def startup_event():
         config={"templates_dir": "templates"}
     )
     
+    # Initialize security agent
+    security_agent = SecurityAgent(
+        llm_service=llm_service,
+        vector_db_service=vector_db_service,
+        config={"templates_dir": "templates"}
+    )
+    
     # Register agents in the global store
     agents["infrastructure"] = infrastructure_agent
     agents["architecture"] = architecture_agent
+    agents["security"] = security_agent  # Register security agent
 
 # ----- API Routes -----
 
@@ -189,7 +207,7 @@ async def get_status():
 @app.post("/infrastructure/generate", response_model=InfrastructureResponse)
 async def generate_infrastructure(request: InfrastructureRequest):
     """Generate infrastructure as code based on requirements."""
-    if not infrastructure_agent or not architecture_agent:
+    if not infrastructure_agent or not architecture_agent or not security_agent:
         raise HTTPException(status_code=503, detail="Required agents not initialized")
     
     # Create a task ID
@@ -217,22 +235,44 @@ async def generate_infrastructure(request: InfrastructureRequest):
     
     # Get the improved code and findings
     improved_code = arch_result.get("improved_code", generated_code)
-    findings = arch_result.get("findings", {})
+    arch_findings = arch_result.get("findings", {})
     
-    # Update the result with architecture findings
+    # Review security with the security agent
+    security_result = await security_agent.process({
+        "task_id": task_id,
+        "code": improved_code,
+        "cloud_provider": request.cloud_provider,
+        "iac_type": request.iac_type
+    })
+    
+    # Get the security-enhanced code and findings
+    security_enhanced_code = security_result.get("remediated_code", improved_code)
+    security_vulnerabilities = security_result.get("vulnerabilities", [])
+    
+    # Convert vulnerabilities list to a dictionary for the response
+    security_findings = {
+        "vulnerabilities": security_vulnerabilities,
+        "summary": security_result.get("remediation_summary", ""),
+        "risk_score": security_result.get("risk_score", 0),
+        "compliance_results": security_result.get("compliance_results", {})
+    }
+    
+    # Update the result with architecture and security findings
     result = {
         "task_id": task_id,
-        "code": improved_code,  # Use the improved code
+        "code": security_enhanced_code,  # Use the security-enhanced code
         "metadata": infra_result.get("metadata", {}),
         "thoughts": infra_result.get("thoughts", ""),
-        "architecture_findings": findings,
+        "architecture_findings": arch_findings,
+        "security_findings": security_findings,
         "iac_type": request.iac_type,
         "cloud_provider": request.cloud_provider
     }
     
-    # Add architecture findings to metadata
+    # Add architecture and security findings to metadata
     if "metadata" in result:
-        result["metadata"]["architecture_findings"] = findings
+        result["metadata"]["architecture_findings"] = arch_findings
+        result["metadata"]["security_findings"] = security_findings
     
     # Store the task result
     tasks[task_id] = {
@@ -240,7 +280,8 @@ async def generate_infrastructure(request: InfrastructureRequest):
         "request": request.dict(),
         "result": result,
         "original_code": generated_code,  # Store the original code for reference
-        "improved_code": improved_code,  # Store the improved code
+        "improved_code": improved_code,  # Store the architecture-improved code
+        "secured_code": security_enhanced_code,  # Store the security-enhanced code
         "timestamp": datetime.now().isoformat()
     }
     
@@ -424,6 +465,35 @@ async def list_tasks(
     paginated_tasks = sorted_tasks[offset:offset + limit]
     
     return paginated_tasks
+
+# Add a new endpoint for security review
+@app.post("/security/review", response_model=Dict[str, Any])
+async def review_security(request: SecurityReviewRequest):
+    """Review infrastructure security and suggest improvements."""
+    if not security_agent:
+        raise HTTPException(status_code=503, detail="Security agent not initialized")
+    
+    # Create a task ID
+    task_id = str(uuid.uuid4())
+    
+    # Review security with the security agent
+    result = await security_agent.process({
+        "task_id": task_id,
+        "code": request.infrastructure_code,
+        "cloud_provider": request.cloud_provider,
+        "iac_type": request.iac_type,
+        "compliance_framework": request.compliance_framework
+    })
+    
+    # Store the task result
+    tasks[task_id] = {
+        "type": "security_review",
+        "request": request.dict(),
+        "result": result,
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    return result
 
 # ----- Main function to run the server -----
 
