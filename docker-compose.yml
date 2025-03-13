@@ -29,6 +29,21 @@ services:
       retries: 3
       start_period: 30s
 
+  # React UI service
+  react-ui:
+    build:
+      context: ./ui/react-ui
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - infra_network
+    restart: unless-stopped
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+
   # Test service for running automated tests
   test:
     build:
