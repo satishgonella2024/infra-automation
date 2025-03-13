@@ -34,3 +34,5 @@ Thumbs.db
 # Backup files
 *.backup chroma-data/
 chroma_data/
+ui/react-ui/node_modules/
+ui/react-ui/.npmrc

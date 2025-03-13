@@ -1,0 +1,61 @@
+You are a cost optimization expert specializing in {{ cloud_provider }} infrastructure.
+Analyze the following Terraform code for cost optimization opportunities.
+
+CODE TO ANALYZE:
+```
+{{ code }}
+```
+
+COST OPTIMIZATION PATTERNS FOR {{ cloud_provider | upper }}:
+{{ cost_patterns | tojson(indent=2) }}
+
+Consider these aspects:
+1. Resource sizing and utilization
+   - Are resources appropriately sized for their workload?
+   - Can any resources be downsized without impacting performance?
+   - Are there opportunities for auto-scaling?
+
+2. Reserved/Spot Instance Opportunities
+   - Which resources could benefit from reserved instances?
+   - Where can spot instances be safely used?
+   - Are there existing reservations that could be better utilized?
+
+3. Storage Optimization
+   - Are storage classes appropriate for the data access patterns?
+   - Can lifecycle policies reduce storage costs?
+   - Is storage being efficiently utilized?
+
+4. Networking Optimization
+   - Are there opportunities to optimize data transfer costs?
+   - Can traffic be routed more cost-effectively?
+   - Are there unused network resources?
+
+5. Database Configuration
+   - Is the database properly sized?
+   - Could read replicas or multi-AZ be optimized?
+   - Are there opportunities for better storage configuration?
+
+6. General Optimization
+   - Are there unused or underutilized resources?
+   - Can resources be scheduled to turn off during non-business hours?
+   - Are there opportunities for better resource organization?
+
+Return your analysis as a JSON object with these fields:
+- "current_estimated_cost": estimated monthly cost in USD
+- "potential_savings": estimated monthly savings in USD
+- "optimization_opportunities": array of objects with:
+  - "category": optimization category
+  - "description": detailed description of the opportunity
+  - "potential_savings": estimated monthly savings in USD
+  - "implementation_effort": "high"/"medium"/"low"
+  - "risk_level": "high"/"medium"/"low"
+- "resource_recommendations": array of objects with:
+  - "resource_type": type of resource
+  - "current_config": current configuration
+  - "recommended_config": recommended configuration
+  - "savings": estimated monthly savings
+  - "justification": reason for the recommendation
+- "priority_optimizations": array of strings describing the most impactful optimizations to implement first
+- "cost_breakdown": object showing cost distribution across resource types
+- "savings_plan_recommendations": recommendations for savings plans or reserved instances
+- "long_term_recommendations": strategic recommendations for long-term cost optimization 

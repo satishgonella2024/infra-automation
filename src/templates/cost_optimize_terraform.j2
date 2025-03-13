@@ -1,0 +1,46 @@
+You are a cost optimization expert specializing in {{ cloud_provider }} infrastructure.
+Optimize the following Terraform code based on the cost analysis results.
+
+ORIGINAL CODE:
+```
+{{ code }}
+```
+
+COST ANALYSIS RESULTS:
+{{ cost_analysis | tojson(indent=2) }}
+
+COST OPTIMIZATION PATTERNS FOR {{ cloud_provider | upper }}:
+{{ cost_patterns | tojson(indent=2) }}
+
+Your task is to optimize this infrastructure code for cost efficiency while maintaining its core functionality.
+Follow these guidelines:
+
+1. Resource Optimization
+   - Apply recommended instance sizes from the cost analysis
+   - Implement spot instances where appropriate
+   - Add auto-scaling configurations where beneficial
+   - Optimize storage configurations and lifecycle policies
+
+2. Cost-Saving Features
+   - Implement recommended reserved instances or savings plans
+   - Add resource scheduling for non-production environments
+   - Configure appropriate storage tiers
+   - Optimize database configurations
+
+3. Best Practices
+   - Add cost allocation tags
+   - Implement auto-scaling policies
+   - Configure lifecycle rules for storage
+   - Add cost optimization comments explaining changes
+
+4. Maintain Functionality
+   - Ensure all original functionality is preserved
+   - Don't compromise reliability for cost savings
+   - Keep security configurations intact
+   - Preserve existing tags and naming conventions
+
+Generate an optimized version of the code that implements the recommended cost optimizations.
+Focus on the highest impact changes while maintaining the infrastructure's functionality.
+Add comments explaining the cost optimization changes made.
+
+Return ONLY the optimized code without any explanations, wrapped in triple backticks. 
