@@ -14,7 +14,8 @@ import {
   Chip,
   Stack,
   IconButton,
-  Tooltip
+  Tooltip,
+  CircularProgress
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -25,14 +26,50 @@ import {
   ArrowForward as ArrowForwardIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  Memory,
+  Storage,
+  Speed,
+  Memory as GpuIcon
 } from '@mui/icons-material';
 import { fetchTasks } from '../services/api';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
+import LoadingIndicator from '../components/LoadingIndicator';
+import AgentStatus from '../components/AgentStatus';
+import { formatDistanceToNow } from 'date-fns';
 
 // Register Chart.js components
 ChartJS.register(ArcElement, ChartTooltip, Legend);
+
+// Helper function to format task type
+const formatTaskType = (type) => {
+  if (!type) return 'Unknown Task';
+  return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
+// Helper function to safely get task ID
+const getTaskId = (task) => {
+  return task && (task.id || task.task_id);
+};
+
+const MetricCard = ({ title, value, icon, tooltip }) => (
+  <Tooltip title={tooltip}>
+    <Card sx={{ height: '100%' }}>
+      <CardContent>
+        <Box display="flex" alignItems="center" mb={2}>
+          {icon}
+          <Typography variant="h6" component="div" ml={1}>
+            {title}
+          </Typography>
+        </Box>
+        <Typography variant="h4" component="div">
+          {value}
+        </Typography>
+      </CardContent>
+    </Card>
+  </Tooltip>
+);
 
 function Dashboard({ apiStatus }) {
   const navigate = useNavigate();
@@ -44,62 +81,96 @@ function Dashboard({ apiStatus }) {
     failed: 0,
     inProgress: 0
   });
+  const [metrics, setMetrics] = useState(null);
+  const [error, setError] = useState(null);
+
+  // Load tasks on component mount
+  useEffect(() => {
+    loadTasks();
+    // Set up polling to refresh tasks every 30 seconds
+    const interval = setInterval(loadTasks, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
-    const loadTasks = async () => {
+    const fetchMetrics = async () => {
       try {
-        setLoading(true);
-        const data = await fetchTasks(5, 0);
-        setTasks(data);
-        
-        // Calculate stats
-        const total = data.length;
-        const successful = data.filter(task => task.status === 'completed').length;
-        const failed = data.filter(task => task.status === 'failed').length;
-        const inProgress = data.filter(task => task.status === 'in_progress').length;
-        
-        setStats({
-          total,
-          successful,
-          failed,
-          inProgress
-        });
-      } catch (error) {
-        console.error('Failed to fetch tasks:', error);
-      } finally {
-        setLoading(false);
+        const response = await fetch('http://localhost:8000/metrics');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setMetrics(data);
+        setError(null);
+      } catch (e) {
+        setError(e.message);
       }
     };
 
-    loadTasks();
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 5000); // Update every 5 seconds
+    return () => clearInterval(interval);
   }, []);
 
-  const handleRefresh = async () => {
+  // Load tasks from API
+  const loadTasks = async () => {
     try {
       setLoading(true);
-      const data = await fetchTasks(5, 0);
-      setTasks(data);
+      const response = await fetchTasks(5);
+      
+      // Ensure we have an array of tasks
+      const taskList = Array.isArray(response) ? response : [];
+      setTasks(taskList);
+      
+      // Calculate statistics
+      const total = taskList.length;
+      const successful = taskList.filter(task => task.status === 'completed' || task.status === 'success').length;
+      const failed = taskList.filter(task => task.status === 'failed' || task.status === 'error').length;
+      const inProgress = taskList.filter(task => task.status === 'processing' || task.status === 'in_progress').length;
+      
+      setStats({
+        total,
+        successful,
+        failed,
+        inProgress
+      });
     } catch (error) {
-      console.error('Failed to refresh tasks:', error);
+      console.error('Failed to fetch tasks:', error);
     } finally {
       setLoading(false);
     }
   };
 
+  // Handle refresh button click
+  const handleRefresh = async () => {
+    await loadTasks();
+  };
+
+  // Helper function to get status icon
   const getStatusIcon = (status) => {
+    if (!status) return <WarningIcon color="warning" />;
+    
+    status = status.toLowerCase();
     switch (status) {
       case 'completed':
+      case 'success':
         return <CheckCircleIcon color="success" />;
       case 'failed':
+      case 'error':
         return <ErrorIcon color="error" />;
+      case 'processing':
       case 'in_progress':
         return <WarningIcon color="warning" />;
       default:
-        return null;
+        return <HistoryIcon />;
     }
   };
 
+  // Helper function to get task type icon
   const getTaskTypeIcon = (type) => {
+    if (!type) return <CodeIcon />;
+    
+    type = type.toLowerCase();
     switch (type) {
       case 'infrastructure_generation':
         return <CodeIcon />;
@@ -108,6 +179,17 @@ function Dashboard({ apiStatus }) {
       default:
         return <HistoryIcon />;
     }
+  };
+
+  // Helper function to determine agent status color
+  const getAgentStatusColor = (status) => {
+    if (!status) return 'default';
+    
+    status = status.toLowerCase();
+    if (status === 'idle' || status === 'online' || status === 'running') return 'success';
+    if (status === 'processing' || status === 'busy') return 'warning';
+    if (status === 'error' || status === 'offline') return 'error';
+    return 'default';
   };
 
   const chartData = {
@@ -140,6 +222,30 @@ function Dashboard({ apiStatus }) {
     },
   };
 
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box p={3}>
+        <Typography color="error">Error loading metrics: {error}</Typography>
+      </Box>
+    );
+  }
+
+  const formatBytes = (bytes) => {
+    return `${Math.round(bytes * 10) / 10} GB`;
+  };
+
+  const formatPercent = (value) => {
+    return `${Math.round(value)}%`;
+  };
+
   return (
     <Box className="slide-in-up" sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -156,7 +262,8 @@ function Dashboard({ apiStatus }) {
         </Button>
       </Box>
 
-      {/* Status Cards */}
+      {apiStatus && apiStatus.agents && <AgentStatus agents={apiStatus.agents} />}
+
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} md={3}>
           <Paper
@@ -179,12 +286,12 @@ function Dashboard({ apiStatus }) {
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
               <Chip
-                label={apiStatus.status}
-                color={apiStatus.status === 'online' ? 'success' : 'error'}
+                label={apiStatus?.status || 'unknown'}
+                color={apiStatus?.status === 'online' ? 'success' : 'error'}
                 sx={{ mr: 1 }}
               />
               <Typography variant="body2" color="text.secondary">
-                {apiStatus.status === 'online' ? 'System is operational' : 'System is offline'}
+                {apiStatus?.status === 'online' ? 'System is operational' : 'System is offline'}
               </Typography>
             </Box>
           </Paper>
@@ -206,23 +313,14 @@ function Dashboard({ apiStatus }) {
             }}
           >
             <Typography variant="h6" gutterBottom>
-              Agents
+              System Information
             </Typography>
-            <Stack spacing={1} sx={{ mt: 2 }}>
-              {apiStatus.agents && apiStatus.agents.map((agent) => (
-                <Box key={agent.name} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Chip
-                    size="small"
-                    label={agent.status}
-                    color={agent.status === 'idle' ? 'success' : agent.status === 'processing' ? 'warning' : 'error'}
-                    sx={{ mr: 1 }}
-                  />
-                  <Typography variant="body2">
-                    {agent.name}
-                  </Typography>
-                </Box>
-              ))}
-            </Stack>
+            <Typography variant="body1">
+              Version: {apiStatus.version}
+            </Typography>
+            <Typography variant="body1">
+              Uptime: {Math.floor(apiStatus.uptime_seconds / 3600)} hours {Math.floor((apiStatus.uptime_seconds % 3600) / 60)} minutes
+            </Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} md={6}>
@@ -321,6 +419,51 @@ function Dashboard({ apiStatus }) {
                 onClick={() => navigate('/generate')}
               >
                 Start
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card 
+            sx={{ 
+              height: '100%',
+              transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+              },
+            }}
+          >
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Box
+                  sx={{
+                    backgroundColor: 'success.light',
+                    borderRadius: '50%',
+                    p: 1,
+                    mr: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Storage sx={{ color: 'success.main' }} />
+                </Box>
+                <Typography variant="h6">
+                  Terraform Modules
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Create enterprise-grade Terraform modules with best practices
+              </Typography>
+            </CardContent>
+            <CardActions>
+              <Button 
+                size="small" 
+                endIcon={<ArrowForwardIcon />}
+                onClick={() => navigate('/terraform-modules')}
+              >
+                Create
               </Button>
             </CardActions>
           </Card>
@@ -476,11 +619,17 @@ function Dashboard({ apiStatus }) {
         </Button>
       </Box>
       {loading ? (
-        <LinearProgress sx={{ mb: 2 }} />
+        <Box sx={{ my: 4, display: 'flex', justifyContent: 'center' }}>
+          <LoadingIndicator 
+            message="Loading recent tasks..." 
+            showProgress={false}
+            timeout={30} // 30 seconds timeout
+          />
+        </Box>
       ) : (
         <Grid container spacing={2}>
-          {tasks.map((task) => (
-            <Grid item xs={12} key={task.id}>
+          {tasks.map((task, index) => (
+            <Grid item xs={12} key={getTaskId(task) || index}>
               <Paper
                 elevation={0}
                 sx={{
@@ -497,7 +646,7 @@ function Dashboard({ apiStatus }) {
               >
                 <Grid container alignItems="center" spacing={2}>
                   <Grid item>
-                    <Tooltip title={task.task_type}>
+                    <Tooltip title={task.task_type || 'Unknown Task Type'}>
                       <Box
                         sx={{
                           backgroundColor: task.task_type === 'infrastructure_generation' ? 'primary.light' : 'error.light',
@@ -514,14 +663,15 @@ function Dashboard({ apiStatus }) {
                   </Grid>
                   <Grid item xs>
                     <Typography variant="subtitle1">
-                      {task.description || task.task_type.replace('_', ' ')}
+                      {task.description || formatTaskType(task.task_type)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {new Date(task.created_at).toLocaleString()}
+                      {task.created_at ? new Date(task.created_at).toLocaleString() : 
+                       task.timestamp ? new Date(task.timestamp).toLocaleString() : 'Unknown date'}
                     </Typography>
                   </Grid>
                   <Grid item>
-                    <Tooltip title={task.status}>
+                    <Tooltip title={task.status || 'Unknown Status'}>
                       <Box>
                         {getStatusIcon(task.status)}
                       </Box>
@@ -530,7 +680,14 @@ function Dashboard({ apiStatus }) {
                   <Grid item>
                     <IconButton
                       size="small"
-                      onClick={() => navigate(`/tasks?id=${task.id}`)}
+                      onClick={() => {
+                        const taskId = getTaskId(task);
+                        if (taskId) {
+                          navigate(`/tasks?id=${taskId}`);
+                        } else {
+                          navigate('/tasks');
+                        }
+                      }}
                     >
                       <ArrowForwardIcon fontSize="small" />
                     </IconButton>
@@ -566,6 +723,94 @@ function Dashboard({ apiStatus }) {
           )}
         </Grid>
       )}
+
+      {/* System Metrics */}
+      <Typography variant="h5" gutterBottom sx={{ mb: 2 }}>
+        System Metrics
+      </Typography>
+      <Grid container spacing={3} mb={3}>
+        {metrics && metrics.gpu_usage !== null && (
+          <Grid item xs={12} sm={6} md={3}>
+            <MetricCard
+              title="GPU Usage"
+              value="N/A"
+              icon={<GpuIcon color="primary" />}
+              tooltip="GPU metrics not available"
+            />
+          </Grid>
+        )}
+        
+        {metrics && (
+          <>
+            <Grid item xs={12} sm={6} md={3}>
+              <MetricCard
+                title="CPU Usage"
+                value={metrics.cpu_usage !== undefined ? formatPercent(metrics.cpu_usage) : 'N/A'}
+                icon={<Speed color="primary" />}
+                tooltip="Current CPU utilization"
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <MetricCard
+                title="Memory Usage"
+                value={metrics.memory_usage?.percent !== undefined ? 
+                  formatPercent(metrics.memory_usage.percent) : 'N/A'}
+                icon={<Memory color="primary" />}
+                tooltip={metrics.memory_usage?.used_gb !== undefined ? 
+                  `${formatBytes(metrics.memory_usage.used_gb)} / ${formatBytes(metrics.memory_usage.total_gb)}` :
+                  'Memory metrics not available'
+                }
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <MetricCard
+                title="Disk Usage"
+                value={metrics.disk_usage?.percent !== undefined ? 
+                  formatPercent(metrics.disk_usage.percent) : 'N/A'}
+                icon={<Storage color="primary" />}
+                tooltip={metrics.disk_usage?.used ? 
+                  `${metrics.disk_usage.used} / ${metrics.disk_usage.total}` :
+                  'Disk metrics not available'
+                }
+              />
+            </Grid>
+          </>
+        )}
+      </Grid>
+
+      {/* LLM Service Metrics */}
+      {metrics && metrics.llm_metrics && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              LLM Service Metrics
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="body1">
+                  Total Requests: {metrics.llm_metrics.total_requests || 0}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="body1">
+                  Active Requests: {metrics.llm_metrics.active_requests || 0}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="body1">
+                  Last Request: {metrics.llm_metrics.last_request_time ? 
+                    formatDistanceToNow(new Date(metrics.llm_metrics.last_request_time), { addSuffix: true }) :
+                    'Never'}
+                </Typography>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
+
+      {metrics && metrics.agents && <AgentStatus agents={metrics.agents} />}
     </Box>
   );
 }
