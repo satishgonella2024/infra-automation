@@ -11,38 +11,38 @@
       "name": "reader",
       "description": "Read-only access to resources",
       "permissions": [
-        "*:list",
+        "*:read",
         "*:describe",
-        "*:read"
+        "*:list"
       ]
     },
     {
       "name": "infrastructure",
       "description": "Infrastructure agent role",
       "permissions": [
-        "cloudformation:*",
-        "terraform:*",
         "jenkins:*",
-        "ansible:*"
+        "cloudformation:*",
+        "ansible:*",
+        "terraform:*"
       ]
     },
     {
       "name": "security",
       "description": "Security agent role",
       "permissions": [
-        "cloudformation:read",
-        "jenkins:read",
-        "security:*",
         "ansible:read",
-        "terraform:read"
+        "cloudformation:read",
+        "terraform:read",
+        "security:*",
+        "jenkins:read"
       ]
     },
     {
       "name": "vault",
       "description": "Vault agent role",
       "permissions": [
-        "secrets:*",
-        "vault:*"
+        "vault:*",
+        "secrets:*"
       ]
     },
     {
@@ -78,9 +78,9 @@
       "name": "argocd",
       "description": "ArgoCD agent role",
       "permissions": [
+        "kubernetes:read",
         "argocd:*",
-        "kubernetes:list",
-        "kubernetes:read"
+        "kubernetes:list"
       ]
     }
   ],
