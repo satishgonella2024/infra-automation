@@ -3904,5 +3904,381 @@
     "improved_code": "provider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env_name\" {\n  type = string\n}\n\nvariable \"instance_type\" {\n  type = string\n}\n\nvariable \"ami_id\" {\n  type = string\n}\n\noutput \"ec2_instance_public_ip\" {\n  value = aws_instance.example.public_ip\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"main\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n\n  lifecycle {\n    ignore_changes = [availability_zone]\n  }\n}\n\nresource \"aws_instance\" \"example\" {\n  ami           = var.ami_id\n  instance_type = var.instance_type\n  key_name      = \"my_key_pair_new\"\n  subnet_id     = aws_subnet.main.id\n  vpc_security_group_ids = [aws_security_group.example.id]\n  tags = {\n    Name          = \"${var.env_name}-example\"\n    Environment   = var.env_name\n  }\n\n  lifecycle {\n    ignore_changes = [key_name]\n  }\n}\n\nresource \"aws_s3_bucket\" \"example\" {\n  bucket = \"my-example-bucket\"\n  acl    = \"private\"\n\n  tag {\n    key       = \"Environment\"\n    value      = var.env_name\n  }\n\n  tag {\n    key       = \"Name\"\n    value      = \"${var.env_name}-example\"\n  }\n}\n\nresource \"aws_security_group\" \"example\" {\n  name        = \"my-example-sg\"\n  description = \"Allow inbound traffic on port 80\"\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\noutput \"s3_bucket_arn\" {\n  value = aws_s3_bucket.example.arn\n}",
     "secured_code": "`\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env_name\" {\n  type = string\n}\n\nvariable \"instance_type\" {\n  type = string\n}\n\nvariable \"ami_id\" {\n  type = string\n}\n\noutput \"ec2_instance_public_ip\" {\n  value = aws_instance.example.public_ip\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"main\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n\n  lifecycle {\n    ignore_changes = [availability_zone]\n  }\n}\n\nresource \"aws_instance\" \"example\" {\n  ami           = var.ami_id\n  instance_type = var.instance_type\n  key_name      = \"my_key_pair_new\"\n  subnet_id     = aws_subnet.main.id\n  vpc_security_group_ids = [aws_security_group.example.id]\n  tags = {\n    Name          = \"${var.env_name}-example\"\n    Environment   = var.env_name\n  }\n\n  // Enable EBS encryption for the instance storage\n  encrypted_root_device = true\n\n  lifecycle {\n    ignore_changes = [key_name]\n  }\n}\n\nresource \"aws_s3_bucket\" \"example\" {\n  bucket = \"my-example-bucket\"\n  acl    = \"private\"\n\n  // Enable server-side encryption for the S3 bucket\n  server_side_encryption_configuration {\n    rule {\n      apply_server_side_encryptions_by_default = true\n    }\n  }\n\n  tag {\n    key       = \"Environment\"\n    value      = var.env_name\n  }\n\n  tag {\n    key       = \"Name\"\n    value      = \"${var.env_name}-example\"\n  }\n}\n\nresource \"aws_security_group\" \"example\" {\n  name        = \"my-example-sg\"\n  description = \"Allow inbound traffic on port 80\"\n  vpc_id      = aws_vpc.main.id\n\n  // Restrict incoming traffic to only the necessary IP addresses\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.1/32\", \"1.2.3.4/32\"]\n  }\n}\n\noutput \"s3_bucket_arn\" {\n  value = aws_s3_bucket.example.arn\n}",
     "timestamp": "2025-03-13T23:45:08.371748"
+  },
+  "52a840fe-ddc6-4db6-b0dd-e816894adcbc": {
+    "type": "infrastructure_generation",
+    "request": {
+      "task": "create a simple web application with EC2 and S3",
+      "requirements": {},
+      "cloud_provider": "aws",
+      "iac_type": "terraform"
+    },
+    "result": {
+      "task_id": "52a840fe-ddc6-4db6-b0dd-e816894adcbc",
+      "code": "provider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env\" {\n  type = string\n}\n\nvariable \"ami_id\" {\n  type = string\n}\n\noutput \"ec2_instance_public_ip\" {\n  value = aws_instance.web.public_ip\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.app.name\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = var.ami_id\n  instance_type = \"t3.micro\"\n  vpc_security_group_ids = [aws_security_group.web.id]\n  key_name               = \"my_key\"\n\n  availability_zone = \"us-west-2a\" // Ensure the EC2 instance is in a different AZ to improve reliability\n\n  tags = {\n    Environment = var.env\n    Name         = \"WebServer\"\n  }\n}\n\nresource \"aws_security_group\" \"web\" {\n  name        = \"web-sg\"\n  description = \"Allow HTTP and SSH traffic from trusted IP addresses\"\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"10.0.0.0/8\", \"172.16.0.0/12\", \"192.168.0.0/16\"] // Restrict access to specific IP ranges\n  }\n\n  ingress {\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"10.0.0.0/8\", \"172.16.0.0/12\", \"192.168.0.0/16\"] // Restrict access to specific IP ranges\n  }\n}\n\nresource \"aws_s3_bucket\" \"app\" {\n  bucket = \"my-web-app\"\n  acl    = \"private\"\n\n  versioning {\n    enabled = true\n  }\n\n  replication {\n    role = aws_iam_role.s3_replication.arn\n    bucket = aws_s3_bucket.app.id\n  }\n}\n\nresource \"aws_s3_bucket_encryption\" \"app\" {\n  bucket = aws_s3_bucket.app.id\n\n  // Enable server-side encryption for the S3 bucket\n  enabled = true\n}\n\nresource \"aws_s3_bucket_website\" \"app\" {\n  bucket = aws_s3_bucket.app.id\n\n  index_document = \"index.html\"\n}\n\noutput \"ec2_instance_id\" {\n  value = aws_instance.web.id\n}\n\noutput \"s3_bucket_arn\" {\n  value = aws_s3_bucket.app.arn\n}\n\nresource \"aws_iam_role\" \"s3_replication\" {\n  name        = \"s3-replication-role\"\n  description = \"Role for S3 bucket replication\"\n\n  assume_role_policy = <<POLICY\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"s3.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nPOLICY\n}\n\nresource \"aws_cloudwatch_log_group\" \"ec2_instance\" {\n  name = \"/aws/lambda/${aws_instance.web.id}\"\n}\n\nresource \"aws_cloudwatch_log_stream\" \"ec2_instance\" {\n  name           = \"WebServerLogs\"\n  log_group_name = aws_cloudwatch_log_group.ec2_instance.name\n}",
+      "metadata": {
+        "resource_count": 4,
+        "module_count": 0,
+        "estimated_provisioning_time_minutes": 8,
+        "cloud_provider": "aws",
+        "generated_timestamp": 1741945480.5634487,
+        "similar_patterns_used": 0,
+        "similar_generations_used": 0,
+        "used_rag": false,
+        "architecture_findings": {
+          "reliability": [
+            {
+              "finding": "The use of a single AZ for EC2 instance 'web' may lead to reliability issues in case of region-wide outages."
+            }
+          ],
+          "security": [
+            {
+              "finding": "The security group 'web' allows unrestricted inbound traffic on ports 80 and 22, which could be a potential security risk. Consider restricting the IP addresses or using more restrictive protocols."
+            },
+            {
+              "finding": "The S3 bucket policy allows public read access to all objects in the bucket. This may not be intended behavior. Consider restricting access to specific users or groups instead of making it publicly readable."
+            }
+          ],
+          "cost_optimization": [
+            {
+              "recommendation": "Consider using a more cost-effective instance type for EC2 instances, such as 't3.micro' which is currently discounted."
+            },
+            {
+              "finding": "The S3 bucket is set to public-read, which may incur costs. Consider setting the ACL to 'private' or restricting access to specific users or groups instead of making it publicly readable."
+            }
+          ],
+          "performance": [
+            {
+              "recommendation": "Consider using an Amazon RDS instance as a database for your web application instead of storing data in S3. This would improve performance and scalability."
+            },
+            {
+              "finding": "The EC2 instance 'web' is using a single Elastic IP address, which may lead to issues if the instance is terminated or stopped. Consider assigning multiple Elastic IP addresses or using an ELB for load balancing."
+            }
+          ],
+          "operational_excellence": [
+            {
+              "recommendation": "Consider implementing a more robust backup and disaster recovery strategy for your S3 bucket, such as using Amazon S3 versioning or Amazon S3 Cross-Region Replication."
+            },
+            {
+              "finding": "There are no monitoring or logging configurations in place for the EC2 instance 'web' or the S3 bucket. Consider setting up CloudWatch logs and metrics to monitor performance and detect potential issues."
+            }
+          ],
+          "critical_issues": [
+            {
+              "issue": "The security group 'web' allows unrestricted inbound traffic on ports 80 and 22, which could be a potential security risk."
+            },
+            {
+              "issue": "The S3 bucket policy allows public read access to all objects in the bucket, which may not be intended behavior."
+            }
+          ],
+          "recommendations": [
+            {
+              "recommendation": "Consider implementing a more robust backup and disaster recovery strategy for your S3 bucket, such as using Amazon S3 versioning or Amazon S3 Cross-Region Replication."
+            },
+            {
+              "recommendation": "Implement monitoring and logging configurations in CloudWatch to monitor performance and detect potential issues with the EC2 instance 'web' and S3 bucket."
+            }
+          ]
+        },
+        "security_findings": {
+          "vulnerabilities": [
+            {
+              "severity": "high",
+              "title": "Unencrypted Storage for aws",
+              "description": "Storage resources are not configured with encryption",
+              "remediation": "Enable server-side encryption for all storage resources"
+            }
+          ],
+          "summary": {
+            "remediated_issues_count": 1,
+            "critical_issues_fixed": 1,
+            "issues_by_severity": {
+              "high": 1,
+              "medium": 0,
+              "low": 0
+            },
+            "summary": "Fixed 1 security issues (1 critical)"
+          },
+          "risk_score": 0,
+          "compliance_results": {}
+        }
+      },
+      "thoughts": "A great task! Let's break it down step by step.\n\n**Step 1: Gather Information**\n\nTo complete this task, I'll need to know the following:\n\n* What is the desired web application (e.g., simple website, RESTful API)?\n* What are the requirements for EC2 and S3 (e.g., instance types, storage sizes, regions)?\n* Are there any specific security or compliance requirements?\n* Do we have existing infrastructure or resources that should be used (e.g., VPCs, subnets)?\n\n**Step 2: Identify Potential Challenges and Edge Cases**\n\nSome potential challenges and edge cases to consider:\n\n* EC2 instance type selection: Which instances are suitable for the web application? What about availability zones and regions?\n* S3 bucket configuration: How many buckets do we need? Should they be public or private? Are there specific access controls required?\n* Networking and security: How will traffic flow between EC2 and S3? Are there any firewall rules or network ACLs needed?\n\n**Step 3: Apply Best Practices**\n\nTo ensure a well-designed infrastructure, I'll follow these best practices:\n\n* Use terraform_generation to create the necessary resources (EC2 instances, S3 buckets, etc.).\n* Use security groups and network ACLs to control traffic between EC2 and S3.\n* Implement key pair authentication for EC2 instances.\n* Use IAM roles to manage access to S3 buckets.\n\n**Step 4: Optimal Approach**\n\nTo create the simple web application with EC2 and S3, I'll follow this approach:\n\n1. Create a VPC and subnets using terraform_generation.\n2. Launch an EC2 instance (e.g., t2.micro) with the necessary security group and key pair.\n3. Configure the EC2 instance to use a specific IAM role for accessing S3.\n4. Create an S3 bucket using terraform_generation, and configure it as private or public depending on requirements.\n5. Use Ansible generation to create a simple web server (e.g., Apache) on the EC2 instance.\n\n**Using Capabilities**\n\nTo complete this task, I'll utilize the following capabilities:\n\n* Terraform_generation for creating VPCs, subnets, EC2 instances, and S3 buckets.\n* Ansible_generation for setting up the web server on the EC2 instance.\n* No need to use jenkins_generation or infrastructure_analysis for this specific task.\n\nBy considering these steps and utilizing the necessary capabilities, I'll be able to generate a simple web application with EC2 and S3 that meets the user's requirements.",
+      "architecture_findings": {
+        "reliability": [
+          {
+            "finding": "The use of a single AZ for EC2 instance 'web' may lead to reliability issues in case of region-wide outages."
+          }
+        ],
+        "security": [
+          {
+            "finding": "The security group 'web' allows unrestricted inbound traffic on ports 80 and 22, which could be a potential security risk. Consider restricting the IP addresses or using more restrictive protocols."
+          },
+          {
+            "finding": "The S3 bucket policy allows public read access to all objects in the bucket. This may not be intended behavior. Consider restricting access to specific users or groups instead of making it publicly readable."
+          }
+        ],
+        "cost_optimization": [
+          {
+            "recommendation": "Consider using a more cost-effective instance type for EC2 instances, such as 't3.micro' which is currently discounted."
+          },
+          {
+            "finding": "The S3 bucket is set to public-read, which may incur costs. Consider setting the ACL to 'private' or restricting access to specific users or groups instead of making it publicly readable."
+          }
+        ],
+        "performance": [
+          {
+            "recommendation": "Consider using an Amazon RDS instance as a database for your web application instead of storing data in S3. This would improve performance and scalability."
+          },
+          {
+            "finding": "The EC2 instance 'web' is using a single Elastic IP address, which may lead to issues if the instance is terminated or stopped. Consider assigning multiple Elastic IP addresses or using an ELB for load balancing."
+          }
+        ],
+        "operational_excellence": [
+          {
+            "recommendation": "Consider implementing a more robust backup and disaster recovery strategy for your S3 bucket, such as using Amazon S3 versioning or Amazon S3 Cross-Region Replication."
+          },
+          {
+            "finding": "There are no monitoring or logging configurations in place for the EC2 instance 'web' or the S3 bucket. Consider setting up CloudWatch logs and metrics to monitor performance and detect potential issues."
+          }
+        ],
+        "critical_issues": [
+          {
+            "issue": "The security group 'web' allows unrestricted inbound traffic on ports 80 and 22, which could be a potential security risk."
+          },
+          {
+            "issue": "The S3 bucket policy allows public read access to all objects in the bucket, which may not be intended behavior."
+          }
+        ],
+        "recommendations": [
+          {
+            "recommendation": "Consider implementing a more robust backup and disaster recovery strategy for your S3 bucket, such as using Amazon S3 versioning or Amazon S3 Cross-Region Replication."
+          },
+          {
+            "recommendation": "Implement monitoring and logging configurations in CloudWatch to monitor performance and detect potential issues with the EC2 instance 'web' and S3 bucket."
+          }
+        ]
+      },
+      "security_findings": {
+        "vulnerabilities": [
+          {
+            "severity": "high",
+            "title": "Unencrypted Storage for aws",
+            "description": "Storage resources are not configured with encryption",
+            "remediation": "Enable server-side encryption for all storage resources"
+          }
+        ],
+        "summary": {
+          "remediated_issues_count": 1,
+          "critical_issues_fixed": 1,
+          "issues_by_severity": {
+            "high": 1,
+            "medium": 0,
+            "low": 0
+          },
+          "summary": "Fixed 1 security issues (1 critical)"
+        },
+        "risk_score": 0,
+        "compliance_results": {}
+      },
+      "iac_type": "terraform",
+      "cloud_provider": "aws"
+    },
+    "original_code": "```\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env\" {\n  type = string\n}\n\nvariable \"ami_id\" {\n  type = string\n}\n\noutput \"ec2_instance_public_ip\" {\n  value = aws_instance.web.public_ip\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.app.name\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = var.ami_id\n  instance_type = \"t2.micro\"\n  vpc_security_group_ids = [aws_security_group.web.id]\n  key_name               = \"my_key\"\n\n  tags = {\n    Environment = var.env\n    Name         = \"WebServer\"\n  }\n}\n\nresource \"aws_security_group\" \"web\" {\n  name        = \"web-sg\"\n  description = \"Allow HTTP and SSH traffic\"\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n\n  ingress {\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_s3_bucket\" \"app\" {\n  bucket = \"my-web-app\"\n  acl    = \"public-read\"\n\n  policy = <<POLICY\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicRead\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": [\"s3:GetObject\"],\n      \"Resource\": [\"arn:aws:s3:::my-web-app/*\"]\n    }\n  ]\n}\nPOLICY\n}\n\nresource \"aws_s3_bucket_website\" \"app\" {\n  bucket = aws_s3_bucket.app.id\n\n  index_document = \"index.html\"\n}\n\noutput \"ec2_instance_id\" {\n  value = aws_instance.web.id\n}\n\noutput \"s3_bucket_arn\" {\n  value = aws_s3_bucket.app.arn\n}\n```",
+    "improved_code": "provider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env\" {\n  type = string\n}\n\nvariable \"ami_id\" {\n  type = string\n}\n\noutput \"ec2_instance_public_ip\" {\n  value = aws_instance.web.public_ip\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.app.name\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = var.ami_id\n  instance_type = \"t3.micro\"\n  vpc_security_group_ids = [aws_security_group.web.id]\n  key_name               = \"my_key\"\n\n  availability_zone = \"us-west-2a\" # Ensure the EC2 instance is in a different AZ to improve reliability\n\n  tags = {\n    Environment = var.env\n    Name         = \"WebServer\"\n  }\n}\n\nresource \"aws_security_group\" \"web\" {\n  name        = \"web-sg\"\n  description = \"Allow HTTP and SSH traffic from trusted IP addresses\"\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"10.0.0.0/8\", \"172.16.0.0/12\", \"192.168.0.0/16\"] # Restrict access to specific IP ranges\n  }\n\n  ingress {\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"10.0.0.0/8\", \"172.16.0.0/12\", \"192.168.0.0/16\"] # Restrict access to specific IP ranges\n  }\n}\n\nresource \"aws_s3_bucket\" \"app\" {\n  bucket = \"my-web-app\"\n  acl    = \"private\"\n\n  versioning {\n    enabled = true\n  }\n\n  replication {\n    role = aws_iam_role.s3_replication.arn\n    bucket = aws_s3_bucket.app.id\n  }\n}\n\nresource \"aws_s3_bucket_website\" \"app\" {\n  bucket = aws_s3_bucket.app.id\n\n  index_document = \"index.html\"\n}\n\noutput \"ec2_instance_id\" {\n  value = aws_instance.web.id\n}\n\noutput \"s3_bucket_arn\" {\n  value = aws_s3_bucket.app.arn\n}\n\nresource \"aws_iam_role\" \"s3_replication\" {\n  name        = \"s3-replication-role\"\n  description = \"Role for S3 bucket replication\"\n\n  assume_role_policy = <<POLICY\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"s3.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nPOLICY\n}\n\nresource \"aws_cloudwatch_log_group\" \"ec2_instance\" {\n  name = \"/aws/lambda/${aws_instance.web.id}\"\n}\n\nresource \"aws_cloudwatch_log_stream\" \"ec2_instance\" {\n  name           = \"WebServerLogs\"\n  log_group_name = aws_cloudwatch_log_group.ec2_instance.name\n}",
+    "secured_code": "provider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env\" {\n  type = string\n}\n\nvariable \"ami_id\" {\n  type = string\n}\n\noutput \"ec2_instance_public_ip\" {\n  value = aws_instance.web.public_ip\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.app.name\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = var.ami_id\n  instance_type = \"t3.micro\"\n  vpc_security_group_ids = [aws_security_group.web.id]\n  key_name               = \"my_key\"\n\n  availability_zone = \"us-west-2a\" // Ensure the EC2 instance is in a different AZ to improve reliability\n\n  tags = {\n    Environment = var.env\n    Name         = \"WebServer\"\n  }\n}\n\nresource \"aws_security_group\" \"web\" {\n  name        = \"web-sg\"\n  description = \"Allow HTTP and SSH traffic from trusted IP addresses\"\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"10.0.0.0/8\", \"172.16.0.0/12\", \"192.168.0.0/16\"] // Restrict access to specific IP ranges\n  }\n\n  ingress {\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"10.0.0.0/8\", \"172.16.0.0/12\", \"192.168.0.0/16\"] // Restrict access to specific IP ranges\n  }\n}\n\nresource \"aws_s3_bucket\" \"app\" {\n  bucket = \"my-web-app\"\n  acl    = \"private\"\n\n  versioning {\n    enabled = true\n  }\n\n  replication {\n    role = aws_iam_role.s3_replication.arn\n    bucket = aws_s3_bucket.app.id\n  }\n}\n\nresource \"aws_s3_bucket_encryption\" \"app\" {\n  bucket = aws_s3_bucket.app.id\n\n  // Enable server-side encryption for the S3 bucket\n  enabled = true\n}\n\nresource \"aws_s3_bucket_website\" \"app\" {\n  bucket = aws_s3_bucket.app.id\n\n  index_document = \"index.html\"\n}\n\noutput \"ec2_instance_id\" {\n  value = aws_instance.web.id\n}\n\noutput \"s3_bucket_arn\" {\n  value = aws_s3_bucket.app.arn\n}\n\nresource \"aws_iam_role\" \"s3_replication\" {\n  name        = \"s3-replication-role\"\n  description = \"Role for S3 bucket replication\"\n\n  assume_role_policy = <<POLICY\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"s3.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nPOLICY\n}\n\nresource \"aws_cloudwatch_log_group\" \"ec2_instance\" {\n  name = \"/aws/lambda/${aws_instance.web.id}\"\n}\n\nresource \"aws_cloudwatch_log_stream\" \"ec2_instance\" {\n  name           = \"WebServerLogs\"\n  log_group_name = aws_cloudwatch_log_group.ec2_instance.name\n}",
+    "timestamp": "2025-03-14T09:45:24.947752"
+  },
+  "b85df02d-27a7-4302-af30-4677872ba2ef": {
+    "type": "infrastructure_generation",
+    "request": {
+      "task": "Generate a simple wordpress with EC2 and S3",
+      "requirements": {},
+      "cloud_provider": "aws",
+      "iac_type": "terraform"
+    },
+    "result": {
+      "task_id": "b85df02d-27a7-4302-af30-4677872ba2ef",
+      "code": "provider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env\" {\n  type = string\n}\n\nvariable \"ami_id\" {\n  type = string\n}\n\noutput \"ec2_instance_public_ip\" {\n  value = aws_instance.wordpress.public_ip\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.wordpress_files.name\n}\n\nresource \"aws_instance\" \"wordpress\" {\n  ami           = var.ami_id\n  instance_type = \"c5.large\"\n  vpc_security_group_ids = [aws_security_group.wordpress.id]\n  key_name               = \"my_key\"\n\n  tags = {\n    Environment = var.env\n    Name         = \"WordPressServer\"\n  }\n}\n\nresource \"aws_elb\" \"wordpress\" {\n  name            = \"wordpress-elb\"\n  subnets         = [aws_subnet.wordpress.id]\n  security_groups = [aws_security_group.wordpress.id]\n\n  listener {\n    instance_port     = 80\n    instance_protocol = \"http\"\n    lb_port           = 80\n    lb_protocol       = \"http\"\n  }\n}\n\nresource \"aws_autoscaling_policy\" \"wordpress_asg_policy\" {\n  name                   = \"wordpress-asg-policy\"\n  scaling_adjustment   = 1\n  adjustment_type      = \"ChangeInCapacity\"\n  cooldown             = 300\n\n  policy_type           = \"TargetTrackingScaling\"\n\n  target_tracking_configuration {\n    predefined_metric_specification {\n      predefined_metric_type = \"ASGAverageCPUUtilization\"\n    }\n    target_value       = 50.0\n    scale_in_cooldown  = 300\n    scale_out_cooldown = 300\n  }\n}\n\nresource \"aws_launch_configuration\" \"wordpress_lc\" {\n  name            = \"wordpress-lc\"\n  image_id        = var.ami_id\n  instance_type   = \"c5.large\"\n\n  security_groups = [aws_security_group.wordpress.id]\n  key_name         = \"my_key\"\n\n  depends_on       = [aws_elb.wordpres]\n\n  lifecycle {\n    ignore_changes = [image_id]\n  }\n}\n\nresource \"aws autoscaling_group\" \"wordpress_asg\" {\n  name            = \"wordpress-asg\"\n  launch_configuration = aws_launch_configuration.wordpress_lc.name\n  min_size         = 1\n  max_size         = 3\n  desired_capacity = 2\n\n  vpc_zone_identifier  = [aws_subnet.wordpress.id]\n  target_group_arns   = [aws_lb_target_group.wordpress.arn]\n\n  lifecycle {\n    ignore_changes = [min_size, max_size, desired_capacity]\n  }\n}\n\nresource \"aws_security_group\" \"wordpress\" {\n  name        = \"wordpress-sg\"\n  description = \"Allow HTTP and SSH traffic for WordPress\"\n\n  ingress {\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"10.0.0.0/8\"]\n  }\n\n  egress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_s3_bucket\" \"wordpress_files\" {\n  bucket = \"my-wordpress-files\"\n  acl    = \"public-read\"\n\n  policy = <<POLICY\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicReadGetObject\",\n      \"Effect\": \"Allow\",\n      \"Action\": \"s3:GetObject\",\n      \"Resource\": \"arn:aws:s3:::my-wordpress-files/*\"\n    }\n  ]\n}\nPOLICY\n}\n\nresource \"aws_s3_bucket_public_access_block\" \"wordpress_files\" {\n  bucket = aws_s3_bucket.wordpress_files.id\n\n  block_public_acls   = true\n  block_public_policy = true\n}\n\nresource \"aws_s3_bucket_object\" \"wordpress_index\" {\n  bucket = aws_s3_bucket.wordpress_files.id\n  key    = \"index.html\"\n  content_type = \"text/html\"\n  content = <<EOF\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <title>WordPress</title>\n</head>\n<body>\n  <h1>Welcome to WordPress!</h1>\n</body>\n</html>\nEOF\n}\n\nresource \"aws_s3_bucket_notification\" \"wordpress_files_notification\" {\n  bucket = aws_s3_bucket.wordpress_files.id\n\n  topics = [\n    \"arn:aws:sns:us-west-2:<your_account_id>:WordPressFilesNotification\"\n  ]\n\n  events = [\"s3:ObjectCreated:*\"]\n}",
+      "metadata": {
+        "resource_count": 5,
+        "module_count": 0,
+        "estimated_provisioning_time_minutes": 10,
+        "cloud_provider": "aws",
+        "generated_timestamp": 1741945637.775893,
+        "similar_patterns_used": 0,
+        "similar_generations_used": 1,
+        "used_rag": true,
+        "architecture_findings": {
+          "reliability": [
+            {
+              "finding": "The instance type 't2.micro' is a limited free tier instance and may not be suitable for production workloads."
+            },
+            {
+              "finding": "There is no redundancy or high availability mechanism defined for the EC2 instance, WordPress server."
+            }
+          ],
+          "security": [
+            {
+              "finding": "The security group 'wordpress-sg' allows unrestricted SSH access (0.0.0.0/0) which may not be secure."
+            },
+            {
+              "finding": "The S3 bucket policy allows public read access to the 'my-wordpress-files' bucket, but the public access block is enabled. This seems contradictory and may need review."
+            }
+          ],
+          "cost_optimization": [
+            {
+              "recommendation": "Consider using a more cost-effective instance type or a spot instance for non-production workloads."
+            },
+            {
+              "finding": "The S3 bucket 'my-wordpress-files' is configured to allow public read access, which may result in unnecessary costs if not intended."
+            }
+          ],
+          "performance": [
+            {
+              "recommendation": "Consider using an ELB or Application Load Balancer for load balancing and scalability."
+            },
+            {
+              "finding": "The EC2 instance 'wordpress' does not have any performance optimizations defined, such as caching or optimization of database queries."
+            }
+          ],
+          "operational_excellence": [
+            {
+              "recommendation": "Consider implementing a logging and monitoring solution, such as CloudWatch logs and metrics, to track the performance and health of the EC2 instance."
+            },
+            {
+              "finding": "There is no automated backup or disaster recovery plan defined for the WordPress server or S3 bucket."
+            }
+          ],
+          "critical_issues": [
+            {
+              "criticality": "High",
+              "issue": "The security group 'wordpress-sg' allows unrestricted SSH access, which poses a significant security risk if not reviewed and updated."
+            }
+          ],
+          "recommendations": [
+            {
+              "recommendation": "Implement VPC Flow Logs to track network traffic and monitor for suspicious activity."
+            },
+            {
+              "recommendation": "Use AWS CloudTrail to track API calls and ensure that all changes are logged and audited."
+            },
+            {
+              "recommendation": "Consider using a more secure instance type or a containerized solution like Amazon ECS or Kubernetes."
+            }
+          ]
+        },
+        "security_findings": {
+          "vulnerabilities": [
+            {
+              "severity": "high",
+              "title": "Unencrypted Storage for aws",
+              "description": "Storage resources are not configured with encryption",
+              "remediation": "Enable server-side encryption for all storage resources"
+            },
+            {
+              "severity": "high",
+              "title": "Public Access Enabled",
+              "description": "Resources have public access enabled, which is a security risk",
+              "remediation": "Disable public access for all resources or restrict to specific IPs"
+            }
+          ],
+          "summary": {
+            "remediated_issues_count": 0,
+            "summary": "Remediation failed to produce valid code"
+          },
+          "risk_score": 0,
+          "compliance_results": {}
+        }
+      },
+      "thoughts": "A great task! Let's break it down step by step.\n\n**Step 1: Gather Information**\n\nTo complete this task, I'll need to know the following:\n\n* What is the desired WordPress application (e.g., simple website, blog, e-commerce site)?\n* What are the requirements for EC2 and S3 (e.g., instance types, storage sizes, regions)?\n* Do we have any specific security or compliance requirements?\n* Are there any scalability or performance expectations?\n\n**Potential Challenges or Edge Cases:**\n\n1. **WordPress configuration**: How will we configure WordPress to work with our chosen instance type and S3 storage? Will we use a managed MySQL database or a self-managed one?\n2. **EC2 instance selection**: Which EC2 instance type should we choose based on the expected traffic, CPU usage, and memory requirements for the WordPress application?\n3. **S3 bucket configuration**: How will we configure our S3 bucket to store WordPress files, images, and other assets? Will we use versioning, encryption, or object locking?\n4. **Security and compliance**: Are there any specific security or compliance requirements that need to be met (e.g., PCI-DSS for e-commerce sites)?\n\n**Best Practices:**\n\n1. **Use a consistent naming convention**: Use a consistent naming convention for our resources (e.g., EC2 instances, S3 buckets) to make it easier to manage and track them.\n2. **Monitor resource utilization**: Monitor the resource utilization of our EC2 instances and S3 storage to ensure we're not exceeding expected usage or experiencing performance issues.\n3. **Use infrastructure as code**: Use Terraform or another infrastructure-as-code tool to manage our infrastructure configuration, ensuring reproducibility and version control.\n\n**Optimal Approach:**\n\n1. **Terraform generation**: Use my `terraform_generation` capability to generate the necessary Terraform configurations for EC2 instances, S3 buckets, and any other required resources.\n2. **Ansible generation**: Use my `ansible_generation` capability to generate Ansible playbooks for configuring WordPress, setting up MySQL (if needed), and securing our infrastructure.\n3. **Jenkins integration**: Integrate with Jenkins using my `jenkins_generation` capability to automate the deployment process, including building and deploying our WordPress application.\n\nBy following this approach, we can ensure a scalable, secure, and compliant infrastructure for our WordPress application, while also providing a consistent and reproducible deployment experience.",
+      "architecture_findings": {
+        "reliability": [
+          {
+            "finding": "The instance type 't2.micro' is a limited free tier instance and may not be suitable for production workloads."
+          },
+          {
+            "finding": "There is no redundancy or high availability mechanism defined for the EC2 instance, WordPress server."
+          }
+        ],
+        "security": [
+          {
+            "finding": "The security group 'wordpress-sg' allows unrestricted SSH access (0.0.0.0/0) which may not be secure."
+          },
+          {
+            "finding": "The S3 bucket policy allows public read access to the 'my-wordpress-files' bucket, but the public access block is enabled. This seems contradictory and may need review."
+          }
+        ],
+        "cost_optimization": [
+          {
+            "recommendation": "Consider using a more cost-effective instance type or a spot instance for non-production workloads."
+          },
+          {
+            "finding": "The S3 bucket 'my-wordpress-files' is configured to allow public read access, which may result in unnecessary costs if not intended."
+          }
+        ],
+        "performance": [
+          {
+            "recommendation": "Consider using an ELB or Application Load Balancer for load balancing and scalability."
+          },
+          {
+            "finding": "The EC2 instance 'wordpress' does not have any performance optimizations defined, such as caching or optimization of database queries."
+          }
+        ],
+        "operational_excellence": [
+          {
+            "recommendation": "Consider implementing a logging and monitoring solution, such as CloudWatch logs and metrics, to track the performance and health of the EC2 instance."
+          },
+          {
+            "finding": "There is no automated backup or disaster recovery plan defined for the WordPress server or S3 bucket."
+          }
+        ],
+        "critical_issues": [
+          {
+            "criticality": "High",
+            "issue": "The security group 'wordpress-sg' allows unrestricted SSH access, which poses a significant security risk if not reviewed and updated."
+          }
+        ],
+        "recommendations": [
+          {
+            "recommendation": "Implement VPC Flow Logs to track network traffic and monitor for suspicious activity."
+          },
+          {
+            "recommendation": "Use AWS CloudTrail to track API calls and ensure that all changes are logged and audited."
+          },
+          {
+            "recommendation": "Consider using a more secure instance type or a containerized solution like Amazon ECS or Kubernetes."
+          }
+        ]
+      },
+      "security_findings": {
+        "vulnerabilities": [
+          {
+            "severity": "high",
+            "title": "Unencrypted Storage for aws",
+            "description": "Storage resources are not configured with encryption",
+            "remediation": "Enable server-side encryption for all storage resources"
+          },
+          {
+            "severity": "high",
+            "title": "Public Access Enabled",
+            "description": "Resources have public access enabled, which is a security risk",
+            "remediation": "Disable public access for all resources or restrict to specific IPs"
+          }
+        ],
+        "summary": {
+          "remediated_issues_count": 0,
+          "summary": "Remediation failed to produce valid code"
+        },
+        "risk_score": 0,
+        "compliance_results": {}
+      },
+      "iac_type": "terraform",
+      "cloud_provider": "aws"
+    },
+    "original_code": "```\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env\" {\n  type = string\n}\n\nvariable \"ami_id\" {\n  type = string\n}\n\noutput \"ec2_instance_public_ip\" {\n  value = aws_instance.wordpress.public_ip\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.wordpress_files.name\n}\n\nresource \"aws_instance\" \"wordpress\" {\n  ami           = var.ami_id\n  instance_type = \"t2.micro\"\n  vpc_security_group_ids = [aws_security_group.wordpress.id]\n  key_name               = \"my_key\"\n\n  tags = {\n    Environment = var.env\n    Name         = \"WordPressServer\"\n  }\n}\n\nresource \"aws_security_group\" \"wordpress\" {\n  name        = \"wordpress-sg\"\n  description = \"Allow HTTP and SSH traffic for WordPress\"\n\n  ingress {\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_s3_bucket\" \"wordpress_files\" {\n  bucket = \"my-wordpress-files\"\n  acl    = \"public-read\"\n\n  policy = <<POLICY\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicReadGetObject\",\n      \"Effect\": \"Allow\",\n      \"Action\": \"s3:GetObject\",\n      \"Resource\": \"arn:aws:s3:::my-wordpress-files/*\"\n    }\n  ]\n}\nPOLICY\n}\n\nresource \"aws_s3_bucket_public_access_block\" \"wordpress_files\" {\n  bucket = aws_s3_bucket.wordpress_files.id\n\n  block_public_acls   = true\n  block_public_policy = true\n}\n\nresource \"aws_s3_bucket_object\" \"wordpress_index\" {\n  bucket = aws_s3_bucket.wordpress_files.id\n  key    = \"index.html\"\n  content_type = \"text/html\"\n  content = <<EOF\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <title>WordPress</title>\n</head>\n<body>\n  <h1>Welcome to WordPress!</h1>\n</body>\n</html>\nEOF\n}\n```",
+    "improved_code": "provider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env\" {\n  type = string\n}\n\nvariable \"ami_id\" {\n  type = string\n}\n\noutput \"ec2_instance_public_ip\" {\n  value = aws_instance.wordpress.public_ip\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.wordpress_files.name\n}\n\nresource \"aws_instance\" \"wordpress\" {\n  ami           = var.ami_id\n  instance_type = \"c5.large\"\n  vpc_security_group_ids = [aws_security_group.wordpress.id]\n  key_name               = \"my_key\"\n\n  tags = {\n    Environment = var.env\n    Name         = \"WordPressServer\"\n  }\n}\n\nresource \"aws_elb\" \"wordpress\" {\n  name            = \"wordpress-elb\"\n  subnets         = [aws_subnet.wordpress.id]\n  security_groups = [aws_security_group.wordpress.id]\n\n  listener {\n    instance_port     = 80\n    instance_protocol = \"http\"\n    lb_port           = 80\n    lb_protocol       = \"http\"\n  }\n}\n\nresource \"aws_autoscaling_policy\" \"wordpress_asg_policy\" {\n  name                   = \"wordpress-asg-policy\"\n  scaling_adjustment   = 1\n  adjustment_type      = \"ChangeInCapacity\"\n  cooldown             = 300\n\n  policy_type           = \"TargetTrackingScaling\"\n\n  target_tracking_configuration {\n    predefined_metric_specification {\n      predefined_metric_type = \"ASGAverageCPUUtilization\"\n    }\n    target_value       = 50.0\n    scale_in_cooldown  = 300\n    scale_out_cooldown = 300\n  }\n}\n\nresource \"aws_launch_configuration\" \"wordpress_lc\" {\n  name            = \"wordpress-lc\"\n  image_id        = var.ami_id\n  instance_type   = \"c5.large\"\n\n  security_groups = [aws_security_group.wordpress.id]\n  key_name         = \"my_key\"\n\n  depends_on       = [aws_elb.wordpres]\n\n  lifecycle {\n    ignore_changes = [image_id]\n  }\n}\n\nresource \"aws autoscaling_group\" \"wordpress_asg\" {\n  name            = \"wordpress-asg\"\n  launch_configuration = aws_launch_configuration.wordpress_lc.name\n  min_size         = 1\n  max_size         = 3\n  desired_capacity = 2\n\n  vpc_zone_identifier  = [aws_subnet.wordpress.id]\n  target_group_arns   = [aws_lb_target_group.wordpress.arn]\n\n  lifecycle {\n    ignore_changes = [min_size, max_size, desired_capacity]\n  }\n}\n\nresource \"aws_security_group\" \"wordpress\" {\n  name        = \"wordpress-sg\"\n  description = \"Allow HTTP and SSH traffic for WordPress\"\n\n  ingress {\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"10.0.0.0/8\"]\n  }\n\n  egress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_s3_bucket\" \"wordpress_files\" {\n  bucket = \"my-wordpress-files\"\n  acl    = \"public-read\"\n\n  policy = <<POLICY\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicReadGetObject\",\n      \"Effect\": \"Allow\",\n      \"Action\": \"s3:GetObject\",\n      \"Resource\": \"arn:aws:s3:::my-wordpress-files/*\"\n    }\n  ]\n}\nPOLICY\n}\n\nresource \"aws_s3_bucket_public_access_block\" \"wordpress_files\" {\n  bucket = aws_s3_bucket.wordpress_files.id\n\n  block_public_acls   = true\n  block_public_policy = true\n}\n\nresource \"aws_s3_bucket_object\" \"wordpress_index\" {\n  bucket = aws_s3_bucket.wordpress_files.id\n  key    = \"index.html\"\n  content_type = \"text/html\"\n  content = <<EOF\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <title>WordPress</title>\n</head>\n<body>\n  <h1>Welcome to WordPress!</h1>\n</body>\n</html>\nEOF\n}\n\nresource \"aws_s3_bucket_notification\" \"wordpress_files_notification\" {\n  bucket = aws_s3_bucket.wordpress_files.id\n\n  topics = [\n    \"arn:aws:sns:us-west-2:<your_account_id>:WordPressFilesNotification\"\n  ]\n\n  events = [\"s3:ObjectCreated:*\"]\n}",
+    "secured_code": "provider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env\" {\n  type = string\n}\n\nvariable \"ami_id\" {\n  type = string\n}\n\noutput \"ec2_instance_public_ip\" {\n  value = aws_instance.wordpress.public_ip\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.wordpress_files.name\n}\n\nresource \"aws_instance\" \"wordpress\" {\n  ami           = var.ami_id\n  instance_type = \"c5.large\"\n  vpc_security_group_ids = [aws_security_group.wordpress.id]\n  key_name               = \"my_key\"\n\n  tags = {\n    Environment = var.env\n    Name         = \"WordPressServer\"\n  }\n}\n\nresource \"aws_elb\" \"wordpress\" {\n  name            = \"wordpress-elb\"\n  subnets         = [aws_subnet.wordpress.id]\n  security_groups = [aws_security_group.wordpress.id]\n\n  listener {\n    instance_port     = 80\n    instance_protocol = \"http\"\n    lb_port           = 80\n    lb_protocol       = \"http\"\n  }\n}\n\nresource \"aws_autoscaling_policy\" \"wordpress_asg_policy\" {\n  name                   = \"wordpress-asg-policy\"\n  scaling_adjustment   = 1\n  adjustment_type      = \"ChangeInCapacity\"\n  cooldown             = 300\n\n  policy_type           = \"TargetTrackingScaling\"\n\n  target_tracking_configuration {\n    predefined_metric_specification {\n      predefined_metric_type = \"ASGAverageCPUUtilization\"\n    }\n    target_value       = 50.0\n    scale_in_cooldown  = 300\n    scale_out_cooldown = 300\n  }\n}\n\nresource \"aws_launch_configuration\" \"wordpress_lc\" {\n  name            = \"wordpress-lc\"\n  image_id        = var.ami_id\n  instance_type   = \"c5.large\"\n\n  security_groups = [aws_security_group.wordpress.id]\n  key_name         = \"my_key\"\n\n  depends_on       = [aws_elb.wordpres]\n\n  lifecycle {\n    ignore_changes = [image_id]\n  }\n}\n\nresource \"aws autoscaling_group\" \"wordpress_asg\" {\n  name            = \"wordpress-asg\"\n  launch_configuration = aws_launch_configuration.wordpress_lc.name\n  min_size         = 1\n  max_size         = 3\n  desired_capacity = 2\n\n  vpc_zone_identifier  = [aws_subnet.wordpress.id]\n  target_group_arns   = [aws_lb_target_group.wordpress.arn]\n\n  lifecycle {\n    ignore_changes = [min_size, max_size, desired_capacity]\n  }\n}\n\nresource \"aws_security_group\" \"wordpress\" {\n  name        = \"wordpress-sg\"\n  description = \"Allow HTTP and SSH traffic for WordPress\"\n\n  ingress {\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"10.0.0.0/8\"]\n  }\n\n  egress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_s3_bucket\" \"wordpress_files\" {\n  bucket = \"my-wordpress-files\"\n  acl    = \"public-read\"\n\n  policy = <<POLICY\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicReadGetObject\",\n      \"Effect\": \"Allow\",\n      \"Action\": \"s3:GetObject\",\n      \"Resource\": \"arn:aws:s3:::my-wordpress-files/*\"\n    }\n  ]\n}\nPOLICY\n}\n\nresource \"aws_s3_bucket_public_access_block\" \"wordpress_files\" {\n  bucket = aws_s3_bucket.wordpress_files.id\n\n  block_public_acls   = true\n  block_public_policy = true\n}\n\nresource \"aws_s3_bucket_object\" \"wordpress_index\" {\n  bucket = aws_s3_bucket.wordpress_files.id\n  key    = \"index.html\"\n  content_type = \"text/html\"\n  content = <<EOF\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <title>WordPress</title>\n</head>\n<body>\n  <h1>Welcome to WordPress!</h1>\n</body>\n</html>\nEOF\n}\n\nresource \"aws_s3_bucket_notification\" \"wordpress_files_notification\" {\n  bucket = aws_s3_bucket.wordpress_files.id\n\n  topics = [\n    \"arn:aws:sns:us-west-2:<your_account_id>:WordPressFilesNotification\"\n  ]\n\n  events = [\"s3:ObjectCreated:*\"]\n}",
+    "timestamp": "2025-03-14T09:47:52.339980"
   }
 }
