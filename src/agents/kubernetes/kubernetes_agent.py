@@ -5,13 +5,14 @@ This module defines the KubernetesAgent class that specializes in managing
 Kubernetes resources, deployments, and configurations.
 """
 
-import os
-import json
 import logging
+import json
 from typing import Dict, List, Any, Optional, Tuple
 
-from src.agents.base import BaseAgent
-from src.utils.template_utils import render_template
+from src.agents.base.base_agent import BaseAgent
+from src.utils.template_utils import load_template
+
+logger = logging.getLogger(__name__)
 
 class KubernetesAgent(BaseAgent):
     """
@@ -33,18 +34,22 @@ class KubernetesAgent(BaseAgent):
             vector_db_service: Optional service for vector database operations
             config: Optional configuration parameters
         """
+        # Define the agent's capabilities
+        capabilities = [
+            "manifest_generation",
+            "deployment_strategies",
+            "resource_optimization",
+            "security_policies",
+            "network_policies",
+            "cluster_analysis",
+            "troubleshooting"
+        ]
+        
+        # Call the parent class constructor with all required parameters
         super().__init__(
-            name="Kubernetes",
-            description="Manage Kubernetes resources, deployments, and configurations",
-            capabilities=[
-                "manifest_generation",
-                "deployment_strategies",
-                "resource_optimization",
-                "security_policies",
-                "network_policies",
-                "cluster_analysis",
-                "troubleshooting"
-            ],
+            name="kubernetes_agent",
+            description="Agent responsible for managing Kubernetes resources, deployments, and configurations",
+            capabilities=capabilities,
             llm_service=llm_service,
             vector_db_service=vector_db_service,
             config=config
@@ -54,8 +59,7 @@ class KubernetesAgent(BaseAgent):
         self.kubeconfig_path = config.get("kubeconfig_path") if config else None
         self.context = config.get("context") if config else None
         
-        # Set up logging
-        self.logger = logging.getLogger(__name__)
+        logger.info("Kubernetes agent initialized")
     
     async def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -69,21 +73,85 @@ class KubernetesAgent(BaseAgent):
         Returns:
             Dictionary containing the results of the operation
         """
-        action = input_data.get("action", "")
-        parameters = input_data.get("parameters", {})
-        
-        self.logger.info(f"Processing Kubernetes action: {action}")
-        
-        # Update agent state
         self.update_state("processing")
         
-        # Process the action based on the type
-        result = await self.think(input_data)
+        action = input_data.get("action", "")
+        parameters = input_data.get("parameters", {})
+        task_id = input_data.get("task_id", "")
         
-        # Update agent state
-        self.update_state("idle")
-        
-        return result
+        try:
+            # First, think about the task
+            thoughts = await self.think(input_data)
+            
+            # Process the action based on the type
+            if action == "generate_manifests":
+                result = await self.generate_manifests(
+                    application_spec=parameters.get("application_spec", {})
+                )
+            elif action == "analyze_resources":
+                result = await self.analyze_resources(
+                    manifests=parameters.get("manifests", "")
+                )
+            elif action == "generate_network_policy":
+                result = {
+                    "policy": await self.generate_network_policy(
+                        namespace=parameters.get("namespace", "default"),
+                        app_name=parameters.get("app_name", ""),
+                        allowed_ingress=parameters.get("allowed_ingress", []),
+                        allowed_egress=parameters.get("allowed_egress", [])
+                    )
+                }
+            elif action == "troubleshoot_deployment":
+                result = await self.troubleshoot_deployment(
+                    deployment_name=parameters.get("deployment_name", ""),
+                    namespace=parameters.get("namespace", "default"),
+                    logs=parameters.get("logs", ""),
+                    events=parameters.get("events", "")
+                )
+            elif action == "optimize_resources":
+                result = await self.optimize_resources(
+                    manifests=parameters.get("manifests", ""),
+                    metrics_data=parameters.get("metrics_data")
+                )
+            else:
+                result = {
+                    "error": f"Unsupported action: {action}",
+                    "supported_actions": [
+                        "generate_manifests",
+                        "analyze_resources",
+                        "generate_network_policy",
+                        "troubleshoot_deployment",
+                        "optimize_resources"
+                    ]
+                }
+            
+            # Store in memory
+            await self.update_memory({
+                "type": "kubernetes_operation",
+                "action": action,
+                "input": parameters,
+                "output": result,
+                "timestamp": self.last_active_time
+            })
+            
+            self.update_state("idle")
+            return {
+                "task_id": task_id,
+                "action": action,
+                "result": result,
+                "thoughts": thoughts.get("thoughts", ""),
+                "status": "success"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error during Kubernetes operation: {str(e)}")
+            self.update_state("error")
+            return {
+                "task_id": task_id,
+                "action": action,
+                "error": str(e),
+                "status": "error"
+            }
     
     async def generate_manifests(self, application_spec: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -96,6 +164,8 @@ class KubernetesAgent(BaseAgent):
             Dictionary containing the generated manifests
         """
         # Use LLM to generate Kubernetes manifests
+        logger.info(f"Generating Kubernetes manifests for {application_spec.get('name', 'app')}")
+        
         app_name = application_spec.get("name", "app")
         app_type = application_spec.get("type", "web")
         replicas = application_spec.get("replicas", 1)
@@ -120,7 +190,7 @@ class KubernetesAgent(BaseAgent):
         Return only the YAML content without any additional text.
         """
         
-        manifests = await self.llm_service.generate_text(prompt)
+        manifests = await self.llm_service.generate_completion(prompt)
         
         return {
             "application": app_name,
@@ -139,6 +209,8 @@ class KubernetesAgent(BaseAgent):
             Dictionary with analysis results
         """
         # Use LLM to analyze Kubernetes resources
+        logger.info("Analyzing Kubernetes manifests")
+        
         prompt = f"""
         Analyze the following Kubernetes manifests for best practices, security issues, and resource optimizations:
         
@@ -152,25 +224,31 @@ class KubernetesAgent(BaseAgent):
         3. Best practices compliance
         4. Scalability considerations
         5. Specific recommendations for improvement
+        
+        Format your response as JSON with these sections.
         """
         
-        analysis = await self.llm_service.generate_text(prompt)
+        analysis = await self.llm_service.generate_completion(prompt)
         
-        # This is a simplified version of parsing the analysis
-        # In a real implementation, we would parse the LLM response more thoroughly
-        return {
-            "overall_assessment": "Analysis completed",
-            "security_issues": [
-                {"severity": "high", "description": "No resource limits specified"}
-            ],
-            "optimization_suggestions": [
-                {"type": "resources", "description": "Add memory/CPU limits and requests"}
-            ],
-            "best_practices": [
-                {"status": "missing", "description": "Health checks not configured"}
-            ],
-            "full_analysis": analysis
-        }
+        try:
+            # Try to parse as JSON
+            analysis_json = json.loads(analysis)
+            return analysis_json
+        except json.JSONDecodeError:
+            # If parsing fails, return the raw analysis
+            return {
+                "overall_assessment": "Analysis completed",
+                "security_issues": [
+                    {"severity": "high", "description": "No resource limits specified"}
+                ],
+                "optimization_suggestions": [
+                    {"type": "resources", "description": "Add memory/CPU limits and requests"}
+                ],
+                "best_practices": [
+                    {"status": "missing", "description": "Health checks not configured"}
+                ],
+                "full_analysis": analysis
+            }
     
     async def generate_network_policy(self, namespace: str, app_name: str, 
                                     allowed_ingress: List[Dict[str, Any]], 
@@ -188,6 +266,8 @@ class KubernetesAgent(BaseAgent):
             NetworkPolicy manifest as a string
         """
         # Use LLM to generate NetworkPolicy
+        logger.info(f"Generating NetworkPolicy for {app_name} in namespace {namespace}")
+        
         prompt = f"""
         Generate a Kubernetes NetworkPolicy for application '{app_name}' in namespace '{namespace}' with the following rules:
         
@@ -200,7 +280,7 @@ class KubernetesAgent(BaseAgent):
         Return only the YAML content without any additional text.
         """
         
-        policy = await self.llm_service.generate_text(prompt)
+        policy = await self.llm_service.generate_completion(prompt)
         return policy.strip()
     
     async def troubleshoot_deployment(self, deployment_name: str, namespace: str, 
@@ -218,6 +298,8 @@ class KubernetesAgent(BaseAgent):
             Dictionary with troubleshooting results
         """
         # Use LLM to troubleshoot deployment issues
+        logger.info(f"Troubleshooting deployment {deployment_name} in namespace {namespace}")
+        
         prompt = f"""
         Troubleshoot the following Kubernetes deployment issue:
         
@@ -238,26 +320,32 @@ class KubernetesAgent(BaseAgent):
         1. Root cause analysis
         2. Recommended solutions
         3. Prevention measures
+        
+        Format your response as JSON with these sections.
         """
         
-        analysis = await self.llm_service.generate_text(prompt)
+        analysis = await self.llm_service.generate_completion(prompt)
         
-        # Parse the analysis into structured data
-        # This is a simplified version
-        return {
-            "deployment": deployment_name,
-            "namespace": namespace,
-            "root_cause": "Application crash due to missing configuration",
-            "solutions": [
-                "Add required environment variables",
-                "Mount configuration volume"
-            ],
-            "prevention": [
-                "Implement pre-deployment validation",
-                "Add readiness probe"
-            ],
-            "full_analysis": analysis
-        }
+        try:
+            # Try to parse as JSON
+            analysis_json = json.loads(analysis)
+            return analysis_json
+        except json.JSONDecodeError:
+            # If parsing fails, return structured data with the raw analysis
+            return {
+                "deployment": deployment_name,
+                "namespace": namespace,
+                "root_cause": "Application crash due to missing configuration",
+                "solutions": [
+                    "Add required environment variables",
+                    "Mount configuration volume"
+                ],
+                "prevention": [
+                    "Implement pre-deployment validation",
+                    "Add readiness probe"
+                ],
+                "full_analysis": analysis
+            }
     
     async def optimize_resources(self, manifests: str, metrics_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -271,6 +359,8 @@ class KubernetesAgent(BaseAgent):
             Dictionary with optimized manifests
         """
         # Use LLM to optimize resource settings
+        logger.info("Optimizing Kubernetes resource settings")
+        
         prompt = f"""
         Optimize the resource requests and limits in the following Kubernetes manifests:
         
@@ -284,21 +374,27 @@ class KubernetesAgent(BaseAgent):
         1. Optimized manifests
         2. Explanation of changes
         3. Expected benefits
+        
+        Format your response as JSON with "optimized_manifests", "changes", and "benefits" sections.
         """
         
-        response = await self.llm_service.generate_text(prompt)
+        response = await self.llm_service.generate_completion(prompt)
         
-        # Extract the optimized manifests from the response
-        # This is a simplified version
-        return {
-            "optimized_manifests": response.strip(),
-            "changes": [
-                {"resource": "memory_request", "from": "256Mi", "to": "128Mi"},
-                {"resource": "cpu_limit", "from": "500m", "to": "250m"}
-            ],
-            "benefits": [
-                "50% reduction in CPU allocation",
-                "50% reduction in memory allocation",
-                "Improved cluster resource utilization"
-            ]
-        } 
+        try:
+            # Try to parse as JSON
+            response_json = json.loads(response)
+            return response_json
+        except json.JSONDecodeError:
+            # If parsing fails, return structured data with the raw optimized manifests
+            return {
+                "optimized_manifests": response.strip(),
+                "changes": [
+                    {"resource": "memory_request", "from": "256Mi", "to": "128Mi"},
+                    {"resource": "cpu_limit", "from": "500m", "to": "250m"}
+                ],
+                "benefits": [
+                    "50% reduction in CPU allocation",
+                    "50% reduction in memory allocation",
+                    "Improved cluster resource utilization"
+                ]
+            }

@@ -19,6 +19,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from src.integration import integrate_systems, run_initialization_tasks
+
+
 # Import our agent components
 from src.agents.base import BaseAgent
 from src.agents.infra import InfrastructureAgent
@@ -50,8 +53,6 @@ app.add_middleware(
     allow_origins=[
         "http://192.168.5.199",
         "http://192.168.5.199:80",
-        "http://192.168.5.199:3000",
-        "http://localhost:3000",
         "http://localhost:8000",
         "http://localhost"
     ],
@@ -329,6 +330,8 @@ async def startup_event():
     llm_model = os.environ.get("LLM_MODEL", "llama3")
     llm_api_base = os.environ.get("LLM_API_BASE", "http://localhost:11434/api")
     llm_api_key = os.environ.get("LLM_API_KEY")
+
+
     
     # Get ChromaDB configuration
     chroma_db_path = os.environ.get("CHROMA_DB_PATH", "/app/chroma_data")
@@ -343,6 +346,12 @@ async def startup_event():
     
     # Create ChromaDB service
     vector_db_service = ChromaService(config={"db_path": chroma_db_path})
+
+    # Add this
+    integrated_systems = integrate_systems(app, agents)
+    
+    # Add background task to run initialization
+    asyncio.create_task(run_initialization_tasks(agents))
     
     # Create and register agents
     infrastructure_agent = InfrastructureAgent(

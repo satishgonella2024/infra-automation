@@ -10,8 +10,10 @@ import json
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 
-from src.agents.base import BaseAgent
-from src.utils.template_utils import render_template
+from src.agents.base.base_agent import BaseAgent
+from src.utils.template_utils import load_template
+
+logger = logging.getLogger(__name__)
 
 class InfrastructureAgent(BaseAgent):
     """
@@ -33,17 +35,21 @@ class InfrastructureAgent(BaseAgent):
             vector_db_service: Optional service for vector database operations
             config: Optional configuration parameters
         """
+        # Define the agent's capabilities
+        capabilities = [
+            "terraform_generation",
+            "ansible_generation",
+            "jenkins_generation",
+            "infrastructure_analysis",
+            "cost_estimation",
+            "pattern_management"
+        ]
+        
+        # Call the parent class constructor with all required parameters
         super().__init__(
-            name="Infrastructure",
-            description="Generate infrastructure as code based on user requirements",
-            capabilities=[
-                "terraform_generation",
-                "ansible_generation",
-                "jenkins_generation",
-                "infrastructure_analysis",
-                "cost_estimation",
-                "pattern_management"
-            ],
+            name="infrastructure_agent",
+            description="Agent responsible for generating infrastructure as code based on user requirements",
+            capabilities=capabilities,
             llm_service=llm_service,
             vector_db_service=vector_db_service,
             config=config
@@ -82,6 +88,8 @@ class InfrastructureAgent(BaseAgent):
                 }
             }
         }
+        
+        logger.info("Infrastructure Agent initialized")
     
     async def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -97,51 +105,60 @@ class InfrastructureAgent(BaseAgent):
         Returns:
             Dictionary containing the generated code and metadata
         """
-        self.logger.info(f"Processing infrastructure generation request: {input_data.get('task_id', 'unknown')}")
         self.update_state("processing")
         
-        # Extract key information
         task = input_data.get("task", "")
         requirements = input_data.get("requirements", {})
         cloud_provider = input_data.get("cloud_provider", "aws").lower()
         iac_type = input_data.get("iac_type", "terraform").lower()
+        task_id = input_data.get("task_id", "")
         
-        # First, think about the task
-        thoughts = await self.think(input_data)
-        
-        # Generate the appropriate infrastructure code
-        if iac_type == "terraform":
-            code, metadata = await self._generate_terraform(task, requirements, cloud_provider)
-        elif iac_type == "ansible":
-            code, metadata = await self._generate_ansible(task, requirements, cloud_provider)
-        elif iac_type == "jenkins":
-            code, metadata = await self._generate_jenkins(task, requirements)
-        else:
+        try:
+            # First, think about the task
+            thoughts = await self.think(input_data)
+            
+            # Generate the appropriate infrastructure code
+            if iac_type == "terraform":
+                code, metadata = await self._generate_terraform(task, requirements, cloud_provider)
+            elif iac_type == "ansible":
+                code, metadata = await self._generate_ansible(task, requirements, cloud_provider)
+            elif iac_type == "jenkins":
+                code, metadata = await self._generate_jenkins(task, requirements)
+            else:
+                raise ValueError(f"Unsupported IaC type: {iac_type}. Supported types: terraform, ansible, jenkins")
+            
+            # Store in memory
+            await self.update_memory({
+                "type": "infrastructure_generation",
+                "input": input_data,
+                "output": {
+                    "code": code,
+                    "metadata": metadata
+                },
+                "timestamp": self.last_active_time
+            })
+            
+            self.update_state("idle")
             return {
-                "error": f"Unsupported IaC type: {iac_type}",
-                "supported_types": ["terraform", "ansible", "jenkins"]
-            }
-        
-        # Store in memory
-        await self.update_memory({
-            "type": "infrastructure_generation",
-            "input": input_data,
-            "output": {
+                "task_id": task_id,
                 "code": code,
-                "metadata": metadata
-            },
-            "timestamp": self.last_active_time
-        })
-        
-        self.update_state("idle")
-        return {
-            "task_id": input_data.get("task_id", ""),
-            "code": code,
-            "metadata": metadata,
-            "thoughts": thoughts.get("thoughts", ""),
-            "iac_type": iac_type,
-            "cloud_provider": cloud_provider
-        }
+                "metadata": metadata,
+                "thoughts": thoughts.get("thoughts", ""),
+                "iac_type": iac_type,
+                "cloud_provider": cloud_provider,
+                "status": "success"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error during infrastructure generation: {str(e)}")
+            self.update_state("error")
+            return {
+                "task_id": task_id,
+                "error": str(e),
+                "iac_type": iac_type,
+                "cloud_provider": cloud_provider,
+                "status": "error"
+            }
     
     async def _generate_terraform(
         self, 
@@ -150,7 +167,7 @@ class InfrastructureAgent(BaseAgent):
         cloud_provider: str
     ) -> Tuple[str, Dict[str, Any]]:
         """Generate Terraform code based on requirements."""
-        self.logger.info(f"Generating Terraform code for {cloud_provider}")
+        logger.info(f"Generating Terraform code for {cloud_provider}")
         
         # Search for similar patterns if we have a vector DB service
         similar_patterns = []
@@ -167,9 +184,9 @@ class InfrastructureAgent(BaseAgent):
                     n_results=3
                 )
                 
-                self.logger.info(f"Found {len(similar_patterns)} similar patterns")
+                logger.info(f"Found {len(similar_patterns)} similar patterns")
             except Exception as e:
-                self.logger.error(f"Error searching for patterns: {str(e)}")
+                logger.error(f"Error searching for patterns: {str(e)}")
         
         # Also search for similar previous generations from memory
         similar_generations = []
@@ -189,9 +206,9 @@ class InfrastructureAgent(BaseAgent):
                             "code": memory_data["output"]["code"]
                         })
                 
-                self.logger.info(f"Found {len(similar_generations)} similar past generations")
+                logger.info(f"Found {len(similar_generations)} similar past generations")
             except Exception as e:
-                self.logger.error(f"Error retrieving similar generations: {str(e)}")
+                logger.error(f"Error retrieving similar generations: {str(e)}")
         
         # Prepare examples from similar patterns
         examples_text = ""
@@ -235,7 +252,7 @@ class InfrastructureAgent(BaseAgent):
         """
         
         # Generate the code using LLM
-        terraform_code = await self.llm_service.generate(prompt)
+        terraform_code = await self.llm_service.generate_completion(prompt)
         
         # Parse and analyze the generated code for metadata
         resources_count = terraform_code.count("resource ")
@@ -271,9 +288,9 @@ class InfrastructureAgent(BaseAgent):
                         "module_count": module_count
                     }
                 )
-                self.logger.info("Stored generated code as a pattern for future use")
+                logger.info("Stored generated code as a pattern for future use")
             except Exception as e:
-                self.logger.error(f"Error storing pattern: {str(e)}")
+                logger.error(f"Error storing pattern: {str(e)}")
         
         return terraform_code, metadata
     
@@ -284,7 +301,7 @@ class InfrastructureAgent(BaseAgent):
         cloud_provider: str
     ) -> Tuple[str, Dict[str, Any]]:
         """Generate Ansible playbook based on requirements."""
-        self.logger.info(f"Generating Ansible playbook for {cloud_provider}")
+        logger.info(f"Generating Ansible playbook for {cloud_provider}")
         
         # Search for similar patterns if we have a vector DB service
         similar_patterns = []
@@ -297,9 +314,9 @@ class InfrastructureAgent(BaseAgent):
                     iac_type="ansible",
                     n_results=2
                 )
-                self.logger.info(f"Found {len(similar_patterns)} similar Ansible patterns")
+                logger.info(f"Found {len(similar_patterns)} similar Ansible patterns")
             except Exception as e:
-                self.logger.error(f"Error searching for Ansible patterns: {str(e)}")
+                logger.error(f"Error searching for Ansible patterns: {str(e)}")
         
         # Prepare examples from similar patterns
         examples_text = ""
@@ -335,7 +352,7 @@ class InfrastructureAgent(BaseAgent):
         """
         
         # Generate the code using LLM
-        ansible_code = await self.llm_service.generate(prompt)
+        ansible_code = await self.llm_service.generate_completion(prompt)
         
         # Parse and analyze the generated code for metadata
         task_count = ansible_code.count("- name:")
@@ -367,9 +384,9 @@ class InfrastructureAgent(BaseAgent):
                         "role_count": role_count
                     }
                 )
-                self.logger.info("Stored generated Ansible code as a pattern for future use")
+                logger.info("Stored generated Ansible code as a pattern for future use")
             except Exception as e:
-                self.logger.error(f"Error storing Ansible pattern: {str(e)}")
+                logger.error(f"Error storing Ansible pattern: {str(e)}")
         
         return ansible_code, metadata
     
@@ -379,7 +396,7 @@ class InfrastructureAgent(BaseAgent):
         requirements: Dict[str, Any]
     ) -> Tuple[str, Dict[str, Any]]:
         """Generate Jenkins pipeline configuration based on requirements."""
-        self.logger.info("Generating Jenkins pipeline")
+        logger.info("Generating Jenkins pipeline")
         
         # Search for similar patterns if we have a vector DB service
         similar_patterns = []
@@ -391,9 +408,9 @@ class InfrastructureAgent(BaseAgent):
                     iac_type="jenkins",
                     n_results=2
                 )
-                self.logger.info(f"Found {len(similar_patterns)} similar Jenkins patterns")
+                logger.info(f"Found {len(similar_patterns)} similar Jenkins patterns")
             except Exception as e:
-                self.logger.error(f"Error searching for Jenkins patterns: {str(e)}")
+                logger.error(f"Error searching for Jenkins patterns: {str(e)}")
         
         # Prepare examples from similar patterns
         examples_text = ""
@@ -427,7 +444,7 @@ class InfrastructureAgent(BaseAgent):
         """
         
         # Generate the code using LLM
-        jenkins_code = await self.llm_service.generate(prompt)
+        jenkins_code = await self.llm_service.generate_completion(prompt)
         
         # Parse and analyze the generated code for metadata
         stage_count = jenkins_code.count("stage(")
@@ -458,9 +475,9 @@ class InfrastructureAgent(BaseAgent):
                         "parallel_count": parallel_count
                     }
                 )
-                self.logger.info("Stored generated Jenkins code as a pattern for future use")
+                logger.info("Stored generated Jenkins code as a pattern for future use")
             except Exception as e:
-                self.logger.error(f"Error storing Jenkins pattern: {str(e)}")
+                logger.error(f"Error storing Jenkins pattern: {str(e)}")
         
         return jenkins_code, metadata
     
@@ -475,7 +492,7 @@ class InfrastructureAgent(BaseAgent):
         Returns:
             Analysis results including issues, optimizations, and security concerns
         """
-        self.logger.info(f"Analyzing {iac_type} infrastructure code")
+        logger.info(f"Analyzing {iac_type} infrastructure code")
         self.update_state("analyzing")
         
         # Prepare the prompt for the LLM
@@ -504,13 +521,13 @@ class InfrastructureAgent(BaseAgent):
         """
         
         # Generate the analysis using LLM
-        analysis_json = await self.llm_service.generate(prompt)
+        analysis_json = await self.llm_service.generate_completion(prompt)
         
         # Parse the JSON response
         try:
             analysis = json.loads(analysis_json)
         except json.JSONDecodeError:
-            self.logger.error("Failed to parse analysis JSON")
+            logger.error("Failed to parse analysis JSON")
             analysis = {
                 "error": "Failed to parse analysis",
                 "raw_output": analysis_json,
@@ -537,7 +554,7 @@ class InfrastructureAgent(BaseAgent):
         Returns:
             Cost estimation results
         """
-        self.logger.info(f"Estimating costs for {cloud_provider} using {iac_type}")
+        logger.info(f"Estimating costs for {cloud_provider} using {iac_type}")
         self.update_state("estimating")
         
         # Prepare the prompt for the LLM
@@ -598,13 +615,13 @@ class InfrastructureAgent(BaseAgent):
         """
         
         # Generate the cost estimation using LLM
-        cost_json = await self.llm_service.generate(prompt)
+        cost_json = await self.llm_service.generate_completion(prompt)
         
         # Parse the JSON response
         try:
             cost_estimate = json.loads(cost_json)
         except json.JSONDecodeError:
-            self.logger.error("Failed to parse cost estimation JSON")
+            logger.error("Failed to parse cost estimation JSON")
             cost_estimate = {
                 "error": "Failed to parse cost estimation",
                 "raw_output": cost_json,

@@ -1,0 +1,88 @@
+{
+  "roles": [
+    {
+      "name": "admin",
+      "description": "Administrator with full access",
+      "permissions": [
+        "*:*"
+      ]
+    },
+    {
+      "name": "reader",
+      "description": "Read-only access to resources",
+      "permissions": [
+        "*:list",
+        "*:describe",
+        "*:read"
+      ]
+    },
+    {
+      "name": "infrastructure",
+      "description": "Infrastructure agent role",
+      "permissions": [
+        "cloudformation:*",
+        "terraform:*",
+        "jenkins:*",
+        "ansible:*"
+      ]
+    },
+    {
+      "name": "security",
+      "description": "Security agent role",
+      "permissions": [
+        "cloudformation:read",
+        "jenkins:read",
+        "security:*",
+        "ansible:read",
+        "terraform:read"
+      ]
+    },
+    {
+      "name": "vault",
+      "description": "Vault agent role",
+      "permissions": [
+        "secrets:*",
+        "vault:*"
+      ]
+    },
+    {
+      "name": "jira",
+      "description": "Jira agent role",
+      "permissions": [
+        "jira:*"
+      ]
+    },
+    {
+      "name": "github",
+      "description": "GitHub agent role",
+      "permissions": [
+        "github:*",
+        "git:*"
+      ]
+    },
+    {
+      "name": "confluence",
+      "description": "Confluence agent role",
+      "permissions": [
+        "confluence:*"
+      ]
+    },
+    {
+      "name": "kubernetes",
+      "description": "Kubernetes agent role",
+      "permissions": [
+        "kubernetes:*"
+      ]
+    },
+    {
+      "name": "argocd",
+      "description": "ArgoCD agent role",
+      "permissions": [
+        "argocd:*",
+        "kubernetes:list",
+        "kubernetes:read"
+      ]
+    }
+  ],
+  "agent_roles": {}
+}

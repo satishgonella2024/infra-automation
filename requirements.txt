@@ -32,3 +32,4 @@ flake8>=6.0.0
 tqdm>=4.65.0
 rich>=13.3.5
 psutil>=5.9.0
+async-timeout>=4.0.0
