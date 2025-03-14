@@ -11,19 +11,19 @@
       "name": "reader",
       "description": "Read-only access to resources",
       "permissions": [
+        "*:read",
         "*:list",
-        "*:describe",
-        "*:read"
+        "*:describe"
       ]
     },
     {
       "name": "infrastructure",
       "description": "Infrastructure agent role",
       "permissions": [
-        "terraform:*",
         "cloudformation:*",
         "ansible:*",
-        "jenkins:*"
+        "jenkins:*",
+        "terraform:*"
       ]
     },
     {
@@ -31,10 +31,10 @@
       "description": "Security agent role",
       "permissions": [
         "terraform:read",
-        "ansible:read",
         "security:*",
-        "cloudformation:read",
-        "jenkins:read"
+        "ansible:read",
+        "jenkins:read",
+        "cloudformation:read"
       ]
     },
     {

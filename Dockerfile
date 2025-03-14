@@ -11,6 +11,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
+# Add separate section for optional GPU monitoring tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg2 \
+    && curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add - \
+    && distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
+    && curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list > /etc/apt/sources.list.d/nvidia-docker.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nvidia-container-toolkit-base || true \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install psutil first
 RUN pip install --no-cache-dir psutil>=5.9.0
 
