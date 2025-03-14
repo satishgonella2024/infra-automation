@@ -5,13 +5,13 @@ This module defines the GitHubAgent class that specializes in managing
 GitHub repositories, pull requests, issues, and workflows.
 """
 
-import os
-import json
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 
-from src.agents.base import BaseAgent
-from src.utils.template_utils import render_template
+from src.agents.base.base_agent import BaseAgent
+from src.utils.template_utils import load_template
+
+logger = logging.getLogger(__name__)
 
 class GitHubAgent(BaseAgent):
     """
@@ -33,18 +33,22 @@ class GitHubAgent(BaseAgent):
             vector_db_service: Optional service for vector database operations
             config: Optional configuration parameters
         """
+        # Define the agent's capabilities
+        capabilities = [
+            "repository_management",
+            "pull_request_automation",
+            "code_review",
+            "issue_tracking",
+            "github_actions_workflow",
+            "branch_management",
+            "release_management"
+        ]
+        
+        # Call the parent class constructor with all required parameters
         super().__init__(
-            name="GitHub",
-            description="Manage GitHub repositories, code, and workflows for infrastructure automation",
-            capabilities=[
-                "repository_management",
-                "pull_request_automation",
-                "code_review",
-                "issue_tracking",
-                "github_actions_workflow",
-                "branch_management",
-                "release_management"
-            ],
+            name="github_agent",
+            description="Agent responsible for managing GitHub repositories, code, and workflows",
+            capabilities=capabilities,
             llm_service=llm_service,
             vector_db_service=vector_db_service,
             config=config
@@ -55,8 +59,7 @@ class GitHubAgent(BaseAgent):
         self.github_username = config.get("github_username") if config else None
         self.github_org = config.get("github_org") if config else None
         
-        # Set up logging
-        self.logger = logging.getLogger(__name__)
+        logger.info("GitHub agent initialized")
     
     async def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -70,21 +73,92 @@ class GitHubAgent(BaseAgent):
         Returns:
             Dictionary containing the results of the operation
         """
-        action = input_data.get("action", "")
-        parameters = input_data.get("parameters", {})
-        
-        self.logger.info(f"Processing GitHub action: {action}")
-        
-        # Update agent state
         self.update_state("processing")
         
-        # Process the action based on the type
-        result = await self.think(input_data)
+        action = input_data.get("action", "")
+        parameters = input_data.get("parameters", {})
+        task_id = input_data.get("task_id", "")
         
-        # Update agent state
-        self.update_state("idle")
-        
-        return result
+        try:
+            # First, think about how to approach the task
+            thoughts = await self.think(input_data)
+            
+            # Process the action based on the type
+            if action == "create_repository":
+                result = await self.create_repository(
+                    name=parameters.get("name", ""),
+                    description=parameters.get("description", ""),
+                    private=parameters.get("private", False),
+                    template_repo=parameters.get("template_repo")
+                )
+            elif action == "create_pull_request":
+                result = await self.create_pull_request(
+                    repo=parameters.get("repo", ""),
+                    title=parameters.get("title", ""),
+                    body=parameters.get("body", ""),
+                    head=parameters.get("head", ""),
+                    base=parameters.get("base", "main")
+                )
+            elif action == "generate_workflow":
+                result = {
+                    "workflow": await self.generate_github_actions_workflow(
+                        repo_type=parameters.get("repo_type", ""),
+                        language=parameters.get("language", ""),
+                        ci_requirements=parameters.get("ci_requirements", [])
+                    )
+                }
+            elif action == "review_code":
+                result = await self.review_code(
+                    code=parameters.get("code", ""),
+                    language=parameters.get("language", ""),
+                    review_focus=parameters.get("review_focus", [])
+                )
+            elif action == "manage_release":
+                result = await self.manage_releases(
+                    repo=parameters.get("repo", ""),
+                    version=parameters.get("version", ""),
+                    release_notes=parameters.get("release_notes", ""),
+                    target_branch=parameters.get("target_branch", "main")
+                )
+            else:
+                result = {
+                    "error": f"Unsupported action: {action}",
+                    "supported_actions": [
+                        "create_repository",
+                        "create_pull_request",
+                        "generate_workflow",
+                        "review_code",
+                        "manage_release"
+                    ]
+                }
+            
+            # Store in memory
+            await self.update_memory({
+                "type": "github_operation",
+                "action": action,
+                "input": parameters,
+                "output": result,
+                "timestamp": self.last_active_time
+            })
+            
+            self.update_state("idle")
+            return {
+                "task_id": task_id,
+                "action": action,
+                "result": result,
+                "thoughts": thoughts.get("thoughts", ""),
+                "status": "success"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error during GitHub operation: {str(e)}")
+            self.update_state("error")
+            return {
+                "task_id": task_id,
+                "action": action,
+                "error": str(e),
+                "status": "error"
+            }
     
     async def create_repository(self, name: str, description: str, private: bool = False, 
                               template_repo: Optional[str] = None) -> Dict[str, Any]:
@@ -101,7 +175,7 @@ class GitHubAgent(BaseAgent):
             Dictionary containing the created repository details
         """
         # This would integrate with the GitHub API in a real implementation
-        # For now, we'll simulate the response
+        logger.info(f"Creating GitHub repository: {name}")
         
         org_or_user = self.github_org if self.github_org else self.github_username
         repo_url = f"https://github.com/{org_or_user}/{name}"
@@ -132,7 +206,7 @@ class GitHubAgent(BaseAgent):
             Dictionary containing the created PR details
         """
         # This would integrate with the GitHub API in a real implementation
-        # For now, we'll simulate the response
+        logger.info(f"Creating GitHub PR in {repo}: {title}")
         
         pr_number = hash(f"{repo}:{title}") % 1000
         
@@ -160,6 +234,8 @@ class GitHubAgent(BaseAgent):
             GitHub Actions workflow YAML as a string
         """
         # Use LLM to generate GitHub Actions workflow
+        logger.info(f"Generating GitHub Actions workflow for {language} {repo_type}")
+        
         prompt = f"""
         Generate a GitHub Actions workflow YAML file for a {repo_type} project written in {language}.
         
@@ -169,7 +245,7 @@ class GitHubAgent(BaseAgent):
         Return only the YAML content without any additional text.
         """
         
-        response = await self.llm_service.generate_text(prompt)
+        response = await self.llm_service.generate_completion(prompt)
         return response.strip()
     
     async def review_code(self, code: str, language: str, review_focus: List[str]) -> Dict[str, Any]:
@@ -185,6 +261,8 @@ class GitHubAgent(BaseAgent):
             Dictionary with review comments and suggestions
         """
         # Use LLM to review code
+        logger.info(f"Reviewing {language} code focusing on {', '.join(review_focus)}")
+        
         prompt = f"""
         Review the following {language} code focusing on {', '.join(review_focus)}:
         
@@ -199,7 +277,7 @@ class GitHubAgent(BaseAgent):
         4. Code examples for fixes
         """
         
-        response = await self.llm_service.generate_text(prompt)
+        response = await self.llm_service.generate_completion(prompt)
         
         # Parse the response into structured feedback
         # This is a simplified version
@@ -229,7 +307,7 @@ class GitHubAgent(BaseAgent):
             Dictionary with release information
         """
         # This would create a release in GitHub
-        # For now, we'll simulate the response
+        logger.info(f"Creating release v{version} for {repo}")
         
         return {
             "tag_name": f"v{version}",
@@ -240,4 +318,4 @@ class GitHubAgent(BaseAgent):
             "created_at": "2023-01-01T00:00:00Z",
             "published_at": "2023-01-01T00:00:00Z",
             "html_url": f"https://github.com/{repo}/releases/tag/v{version}"
-        } 
+        }

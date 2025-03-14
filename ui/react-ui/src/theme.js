@@ -101,12 +101,14 @@ const theme = createTheme({
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
-          boxShadow: '0px 3px 6px rgba(0, 0, 0, 0.1)',
-          transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+          background: 'rgba(255, 255, 255, 0.1)',  // Light transparency
+          backdropFilter: 'blur(10px)',  // Frosted Glass Effect
+          borderRadius: '16px',
+          boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.15)',
+          transition: 'all 0.3s ease-in-out',
           '&:hover': {
             transform: 'translateY(-4px)',
-            boxShadow: '0px 6px 12px rgba(0, 0, 0, 0.15)',
+            boxShadow: '0px 15px 35px rgba(0, 0, 0, 0.2)',
           },
         },
       },

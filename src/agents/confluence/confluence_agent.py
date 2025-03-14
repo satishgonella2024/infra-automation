@@ -5,13 +5,13 @@ This module defines the ConfluenceAgent class that specializes in managing
 Confluence documentation, spaces, and pages for infrastructure documentation.
 """
 
-import os
-import json
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 
-from src.agents.base import BaseAgent
-from src.utils.template_utils import render_template
+from src.agents.base.base_agent import BaseAgent
+from src.utils.template_utils import load_template
+
+logger = logging.getLogger(__name__)
 
 class ConfluenceAgent(BaseAgent):
     """
@@ -33,18 +33,22 @@ class ConfluenceAgent(BaseAgent):
             vector_db_service: Optional service for vector database operations
             config: Optional configuration parameters
         """
+        # Define the agent's capabilities
+        capabilities = [
+            "page_creation",
+            "page_update",
+            "space_management",
+            "documentation_generation",
+            "template_management",
+            "knowledge_base_organization",
+            "markdown_to_confluence"
+        ]
+        
+        # Call the parent class constructor with all required parameters
         super().__init__(
-            name="Confluence",
-            description="Manage Confluence documentation for infrastructure and processes",
-            capabilities=[
-                "page_creation",
-                "page_update",
-                "space_management",
-                "documentation_generation",
-                "template_management",
-                "knowledge_base_organization",
-                "markdown_to_confluence"
-            ],
+            name="confluence_agent",
+            description="Agent responsible for managing Confluence documentation for infrastructure and processes",
+            capabilities=capabilities,
             llm_service=llm_service,
             vector_db_service=vector_db_service,
             config=config
@@ -55,8 +59,7 @@ class ConfluenceAgent(BaseAgent):
         self.confluence_username = config.get("confluence_username") if config else None
         self.confluence_api_token = config.get("confluence_api_token") if config else None
         
-        # Set up logging
-        self.logger = logging.getLogger(__name__)
+        logger.info("Confluence agent initialized")
     
     async def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -70,21 +73,89 @@ class ConfluenceAgent(BaseAgent):
         Returns:
             Dictionary containing the results of the operation
         """
-        action = input_data.get("action", "")
-        parameters = input_data.get("parameters", {})
-        
-        self.logger.info(f"Processing Confluence action: {action}")
-        
-        # Update agent state
         self.update_state("processing")
         
-        # Process the action based on the type
-        result = await self.think(input_data)
+        action = input_data.get("action", "")
+        parameters = input_data.get("parameters", {})
+        task_id = input_data.get("task_id", "")
         
-        # Update agent state
-        self.update_state("idle")
-        
-        return result
+        try:
+            # First, think about how to approach the task
+            thoughts = await self.think(input_data)
+            
+            # Process the action based on the type
+            if action == "create_page":
+                result = await self.create_page(
+                    space_key=parameters.get("space_key", ""),
+                    title=parameters.get("title", ""),
+                    content=parameters.get("content", ""),
+                    parent_id=parameters.get("parent_id")
+                )
+            elif action == "update_page":
+                result = await self.update_page(
+                    page_id=parameters.get("page_id", ""),
+                    title=parameters.get("title", ""),
+                    content=parameters.get("content", ""),
+                    version=parameters.get("version", 1)
+                )
+            elif action == "convert_markdown":
+                result = {
+                    "converted_content": await self.convert_markdown_to_confluence(
+                        parameters.get("markdown_content", "")
+                    )
+                }
+            elif action == "generate_documentation":
+                result = {
+                    "documentation": await self.generate_documentation(
+                        parameters.get("infrastructure_code", ""),
+                        parameters.get("code_type", "terraform")
+                    )
+                }
+            elif action == "create_space":
+                result = await self.create_space(
+                    key=parameters.get("key", ""),
+                    name=parameters.get("name", ""),
+                    description=parameters.get("description", "")
+                )
+            else:
+                result = {
+                    "error": f"Unsupported action: {action}",
+                    "supported_actions": [
+                        "create_page",
+                        "update_page",
+                        "convert_markdown",
+                        "generate_documentation",
+                        "create_space"
+                    ]
+                }
+            
+            # Store in memory
+            await self.update_memory({
+                "type": "confluence_operation",
+                "action": action,
+                "input": parameters,
+                "output": result,
+                "timestamp": self.last_active_time
+            })
+            
+            self.update_state("idle")
+            return {
+                "task_id": task_id,
+                "action": action,
+                "result": result,
+                "thoughts": thoughts.get("thoughts", ""),
+                "status": "success"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error during Confluence operation: {str(e)}")
+            self.update_state("error")
+            return {
+                "task_id": task_id,
+                "action": action,
+                "error": str(e),
+                "status": "error"
+            }
     
     async def create_page(self, space_key: str, title: str, content: str, 
                          parent_id: Optional[str] = None) -> Dict[str, Any]:
@@ -101,7 +172,7 @@ class ConfluenceAgent(BaseAgent):
             Dictionary containing the created page details
         """
         # This would integrate with the Confluence API in a real implementation
-        # For now, we'll simulate the response
+        logger.info(f"Creating Confluence page: {title} in space {space_key}")
         
         page_id = f"{100000 + hash(title) % 900000}"
         
@@ -127,7 +198,7 @@ class ConfluenceAgent(BaseAgent):
             Dictionary containing the updated page details
         """
         # This would integrate with the Confluence API in a real implementation
-        # For now, we'll simulate the response
+        logger.info(f"Updating Confluence page: {page_id}")
         
         return {
             "id": page_id,
@@ -147,6 +218,8 @@ class ConfluenceAgent(BaseAgent):
             Content in Confluence storage format
         """
         # Use LLM to convert markdown to Confluence format
+        logger.info("Converting markdown to Confluence format")
+        
         prompt = f"""
         Convert the following markdown content to Confluence storage format:
         
@@ -157,7 +230,7 @@ class ConfluenceAgent(BaseAgent):
         Return only the Confluence storage format XML without any additional text.
         """
         
-        response = await self.llm_service.generate_text(prompt)
+        response = await self.llm_service.generate_completion(prompt)
         return response.strip()
     
     async def generate_documentation(self, infrastructure_code: str, code_type: str) -> str:
@@ -172,6 +245,8 @@ class ConfluenceAgent(BaseAgent):
             Generated documentation in Confluence storage format
         """
         # Use LLM to generate documentation
+        logger.info(f"Generating documentation for {code_type} code")
+        
         prompt = f"""
         Generate comprehensive Confluence documentation for the following {code_type} code:
         
@@ -191,7 +266,7 @@ class ConfluenceAgent(BaseAgent):
         Format the response in Confluence storage format.
         """
         
-        response = await self.llm_service.generate_text(prompt)
+        response = await self.llm_service.generate_completion(prompt)
         return response.strip()
     
     async def create_space(self, key: str, name: str, description: str) -> Dict[str, Any]:
@@ -207,7 +282,7 @@ class ConfluenceAgent(BaseAgent):
             Dictionary with created space information
         """
         # This would create a space in Confluence
-        # For now, we'll simulate the response
+        logger.info(f"Creating Confluence space: {name} with key {key}")
         
         return {
             "key": key,
@@ -215,4 +290,4 @@ class ConfluenceAgent(BaseAgent):
             "description": {"plain": {"value": description}},
             "status": "Created",
             "url": f"{self.confluence_url}/spaces/{key}" if self.confluence_url else f"https://confluence.example.com/spaces/{key}"
-        } 
+        }

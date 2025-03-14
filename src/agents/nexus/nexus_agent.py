@@ -5,13 +5,13 @@ This module defines the NexusAgent class that specializes in managing
 Nexus repositories for artifacts, containers, and packages.
 """
 
-import os
-import json
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 
-from src.agents.base import BaseAgent
-from src.utils.template_utils import render_template
+from src.agents.base.base_agent import BaseAgent
+from src.utils.template_utils import load_template
+
+logger = logging.getLogger(__name__)
 
 class NexusAgent(BaseAgent):
     """
@@ -33,18 +33,22 @@ class NexusAgent(BaseAgent):
             vector_db_service: Optional service for vector database operations
             config: Optional configuration parameters
         """
+        # Define the agent's capabilities
+        capabilities = [
+            "repository_management",
+            "artifact_management",
+            "container_registry",
+            "package_management",
+            "repository_health_check",
+            "cleanup_policies",
+            "integration_scripts"
+        ]
+        
+        # Call the parent class constructor with all required parameters
         super().__init__(
-            name="Nexus",
-            description="Manage Nexus repositories for artifacts, containers, and packages",
-            capabilities=[
-                "repository_management",
-                "artifact_management",
-                "container_registry",
-                "package_management",
-                "repository_health_check",
-                "cleanup_policies",
-                "integration_scripts"
-            ],
+            name="nexus_agent",
+            description="Agent responsible for managing Nexus repositories for artifacts, containers, and packages",
+            capabilities=capabilities,
             llm_service=llm_service,
             vector_db_service=vector_db_service,
             config=config
@@ -55,8 +59,7 @@ class NexusAgent(BaseAgent):
         self.nexus_username = config.get("nexus_username") if config else None
         self.nexus_password = config.get("nexus_password") if config else None
         
-        # Set up logging
-        self.logger = logging.getLogger(__name__)
+        logger.info("Nexus agent initialized")
     
     async def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -70,21 +73,97 @@ class NexusAgent(BaseAgent):
         Returns:
             Dictionary containing the results of the operation
         """
-        action = input_data.get("action", "")
-        parameters = input_data.get("parameters", {})
-        
-        self.logger.info(f"Processing Nexus action: {action}")
-        
-        # Update agent state
         self.update_state("processing")
         
-        # Process the action based on the type
-        result = await self.think(input_data)
+        action = input_data.get("action", "")
+        parameters = input_data.get("parameters", {})
+        task_id = input_data.get("task_id", "")
         
-        # Update agent state
-        self.update_state("idle")
-        
-        return result
+        try:
+            # First, think about how to approach the task
+            thoughts = await self.think(input_data)
+            
+            # Process the action based on the type
+            if action == "create_repository":
+                result = await self.create_repository(
+                    name=parameters.get("name", ""),
+                    repo_type=parameters.get("repo_type", ""),
+                    format=parameters.get("format", ""),
+                    blob_store=parameters.get("blob_store", "default")
+                )
+            elif action == "upload_artifact":
+                result = await self.upload_artifact(
+                    repository=parameters.get("repository", ""),
+                    artifact_path=parameters.get("artifact_path", ""),
+                    group_id=parameters.get("group_id", ""),
+                    artifact_id=parameters.get("artifact_id", ""),
+                    version=parameters.get("version", "")
+                )
+            elif action == "create_cleanup_policy":
+                result = await self.create_cleanup_policy(
+                    name=parameters.get("name", ""),
+                    format=parameters.get("format", ""),
+                    criteria=parameters.get("criteria", {})
+                )
+            elif action == "generate_integration_script":
+                result = {
+                    "script": await self.generate_integration_script(
+                        tool=parameters.get("tool", ""),
+                        repository=parameters.get("repository", ""),
+                        format=parameters.get("format", "")
+                    )
+                }
+            elif action == "check_repository_health":
+                result = await self.check_repository_health(
+                    repository=parameters.get("repository", "")
+                )
+            elif action == "search_artifacts":
+                result = {
+                    "artifacts": await self.search_artifacts(
+                        query=parameters.get("query", ""),
+                        repository=parameters.get("repository")
+                    )
+                }
+            else:
+                result = {
+                    "error": f"Unsupported action: {action}",
+                    "supported_actions": [
+                        "create_repository",
+                        "upload_artifact",
+                        "create_cleanup_policy",
+                        "generate_integration_script",
+                        "check_repository_health",
+                        "search_artifacts"
+                    ]
+                }
+            
+            # Store in memory
+            await self.update_memory({
+                "type": "nexus_operation",
+                "action": action,
+                "input": parameters,
+                "output": result,
+                "timestamp": self.last_active_time
+            })
+            
+            self.update_state("idle")
+            return {
+                "task_id": task_id,
+                "action": action,
+                "result": result,
+                "thoughts": thoughts.get("thoughts", ""),
+                "status": "success"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error during Nexus operation: {str(e)}")
+            self.update_state("error")
+            return {
+                "task_id": task_id,
+                "action": action,
+                "error": str(e),
+                "status": "error"
+            }
     
     async def create_repository(self, name: str, repo_type: str, format: str, 
                               blob_store: str = "default") -> Dict[str, Any]:
@@ -101,7 +180,7 @@ class NexusAgent(BaseAgent):
             Dictionary containing the created repository details
         """
         # This would integrate with the Nexus API in a real implementation
-        # For now, we'll simulate the response
+        logger.info(f"Creating Nexus repository: {name} of type {repo_type} for format {format}")
         
         return {
             "name": name,
@@ -127,7 +206,7 @@ class NexusAgent(BaseAgent):
             Dictionary containing the upload result
         """
         # This would integrate with the Nexus API in a real implementation
-        # For now, we'll simulate the response
+        logger.info(f"Uploading artifact {artifact_id}-{version} to repository {repository}")
         
         return {
             "repository": repository,
@@ -150,7 +229,7 @@ class NexusAgent(BaseAgent):
             Dictionary containing the created policy details
         """
         # This would integrate with the Nexus API in a real implementation
-        # For now, we'll simulate the response
+        logger.info(f"Creating cleanup policy: {name} for format {format}")
         
         return {
             "name": name,
@@ -173,6 +252,8 @@ class NexusAgent(BaseAgent):
             Integration script as a string
         """
         # Use LLM to generate integration script
+        logger.info(f"Generating {tool} integration script for {repository}")
+        
         prompt = f"""
         Generate an integration script for {tool} to use the Nexus repository '{repository}' with format '{format}'.
         
@@ -184,7 +265,7 @@ class NexusAgent(BaseAgent):
         Return only the script content without any additional text.
         """
         
-        response = await self.llm_service.generate_text(prompt)
+        response = await self.llm_service.generate_completion(prompt)
         return response.strip()
     
     async def check_repository_health(self, repository: str) -> Dict[str, Any]:
@@ -198,7 +279,7 @@ class NexusAgent(BaseAgent):
             Dictionary with health information
         """
         # This would check repository health in a real implementation
-        # For now, we'll simulate the response
+        logger.info(f"Checking health of repository: {repository}")
         
         return {
             "repository": repository,
@@ -220,7 +301,7 @@ class NexusAgent(BaseAgent):
             List of matching artifacts
         """
         # This would search for artifacts in a real implementation
-        # For now, we'll simulate the response
+        logger.info(f"Searching for artifacts matching '{query}' in {repository or 'all repositories'}")
         
         return [
             {
@@ -239,4 +320,4 @@ class NexusAgent(BaseAgent):
                 "format": "maven2",
                 "last_updated": "2023-01-01T00:00:00Z"
             }
-        ] 
+        ]
