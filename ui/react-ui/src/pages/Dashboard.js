@@ -150,7 +150,7 @@ function Dashboard({ apiStatus }) {
   const getStatusIcon = (status) => {
     if (!status) return <WarningIcon color="warning" />;
     
-    status = status.toLowerCase();
+    status = String(status || '').toLowerCase();
     switch (status) {
       case 'completed':
       case 'success':
@@ -170,7 +170,7 @@ function Dashboard({ apiStatus }) {
   const getTaskTypeIcon = (type) => {
     if (!type) return <CodeIcon />;
     
-    type = type.toLowerCase();
+    type = String(type || '').toLowerCase();
     switch (type) {
       case 'infrastructure_generation':
         return <CodeIcon />;
@@ -185,7 +185,7 @@ function Dashboard({ apiStatus }) {
   const getAgentStatusColor = (status) => {
     if (!status) return 'default';
     
-    status = status.toLowerCase();
+    status = String(status || '').toLowerCase();
     if (status === 'idle' || status === 'online' || status === 'running') return 'success';
     if (status === 'processing' || status === 'busy') return 'warning';
     if (status === 'error' || status === 'offline') return 'error';

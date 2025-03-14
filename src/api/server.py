@@ -25,9 +25,17 @@ from src.agents.infra import InfrastructureAgent
 from src.agents.architect import ArchitectureAgent
 from src.agents.security import SecurityAgent
 from src.agents.cost import CostAgent
-from src.agents.terraform import TerraformModuleAgent  # Add import for terraform module agent
+from src.agents.terraform import TerraformModuleAgent
+from src.agents.jira import JiraAgent
+from src.agents.confluence import ConfluenceAgent
+from src.agents.github import GitHubAgent
+from src.agents.nexus import NexusAgent
+from src.agents.kubernetes import KubernetesAgent
+from src.agents.argocd import ArgoCDAgent
 from src.services.llm import LLMService
 from src.services.vector_db import ChromaService
+from src.agents.vault import VaultAgent
+from src.agents.security_scanner import SecurityScannerAgent
 
 # Create the FastAPI app
 app = FastAPI(
@@ -39,7 +47,14 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://192.168.5.199", "http://localhost:3000", "http://localhost"],
+    allow_origins=[
+        "http://192.168.5.199",
+        "http://192.168.5.199:80",
+        "http://192.168.5.199:3000",
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://localhost"
+    ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -48,6 +63,42 @@ app.add_middleware(
 )
 
 # ----- Pydantic Models for Request/Response -----
+
+class JiraRequest(BaseModel):
+    """Request model for Jira operations."""
+    action: str = Field(..., description="Action to perform (create_issue, update_issue, etc.)")
+    parameters: Dict[str, Any] = Field(..., description="Parameters for the action")
+    task_id: Optional[str] = Field(None, description="Optional task ID for tracking")
+
+class ConfluenceRequest(BaseModel):
+    """Request model for Confluence operations."""
+    action: str = Field(..., description="Action to perform (create_page, update_page, etc.)")
+    parameters: Dict[str, Any] = Field(..., description="Parameters for the action")
+    task_id: Optional[str] = Field(None, description="Optional task ID for tracking")
+
+class GitHubRequest(BaseModel):
+    """Request model for GitHub operations."""
+    action: str = Field(..., description="Action to perform (create_repo, create_pr, etc.)")
+    parameters: Dict[str, Any] = Field(..., description="Parameters for the action")
+    task_id: Optional[str] = Field(None, description="Optional task ID for tracking")
+
+class NexusRequest(BaseModel):
+    """Request model for Nexus operations."""
+    action: str = Field(..., description="Action to perform (upload_artifact, search, etc.)")
+    parameters: Dict[str, Any] = Field(..., description="Parameters for the action")
+    task_id: Optional[str] = Field(None, description="Optional task ID for tracking")
+
+class KubernetesRequest(BaseModel):
+    """Request model for Kubernetes operations."""
+    action: str = Field(..., description="Action to perform (deploy, scale, etc.)")
+    parameters: Dict[str, Any] = Field(..., description="Parameters for the action")
+    task_id: Optional[str] = Field(None, description="Optional task ID for tracking")
+
+class ArgoCDRequest(BaseModel):
+    """Request model for ArgoCD operations."""
+    action: str = Field(..., description="Action to perform (sync, create_app, etc.)")
+    parameters: Dict[str, Any] = Field(..., description="Parameters for the action")
+    task_id: Optional[str] = Field(None, description="Optional task ID for tracking")
 
 class InfrastructureRequest(BaseModel):
     """Request model for infrastructure generation."""
@@ -169,6 +220,16 @@ class TerraformModuleResponse(BaseModel):
     cloud_provider: str = Field(..., description="Target cloud provider")
     module_name: str = Field(..., description="Name of the generated module")
 
+class VaultRequest(BaseModel):
+    """Request model for Vault operations."""
+    action: str = Field(..., description="Action to perform (create_secret, read_secret, etc.)")
+    parameters: Dict[str, Any] = Field(..., description="Parameters for the action")
+
+class SecurityScanRequest(BaseModel):
+    """Request model for security scanning."""
+    action: str = Field(..., description="Action to perform (scan_iac, scan_container, etc.)")
+    parameters: Dict[str, Any] = Field(..., description="Parameters for the scan")
+
 # ----- Globals and initialization -----
 
 # Store for our agents
@@ -246,12 +307,22 @@ infrastructure_agent = None
 architecture_agent = None
 security_agent = None
 cost_agent = None
-terraform_module_agent = None  # Add terraform module agent variable
+terraform_module_agent = None
+jira_agent = None
+confluence_agent = None
+github_agent = None
+nexus_agent = None
+kubernetes_agent = None
+argocd_agent = None
+vault_agent = None
+security_scanner_agent = None
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize the system on startup."""
-    global llm_service, vector_db_service, infrastructure_agent, architecture_agent, security_agent, cost_agent, terraform_module_agent  # Add terraform_module_agent to globals
+    global llm_service, vector_db_service, infrastructure_agent, architecture_agent, security_agent, cost_agent, \
+           terraform_module_agent, jira_agent, confluence_agent, github_agent, nexus_agent, kubernetes_agent, argocd_agent, \
+           vault_agent, security_scanner_agent
     
     # Get LLM configuration from environment variables
     llm_provider = os.environ.get("LLM_PROVIDER", "ollama")
@@ -280,32 +351,114 @@ async def startup_event():
         config={"templates_dir": "templates"}
     )
     
-    # Initialize architecture agent
     architecture_agent = ArchitectureAgent(
         llm_service=llm_service,
         vector_db_service=vector_db_service,
         config={"templates_dir": "templates"}
     )
     
-    # Initialize security agent
     security_agent = SecurityAgent(
         llm_service=llm_service,
         vector_db_service=vector_db_service,
         config={"templates_dir": "templates"}
     )
     
-    # Initialize cost optimization agent
     cost_agent = CostAgent(
         llm_service=llm_service,
         vector_db_service=vector_db_service,
         config={"templates_dir": "templates"}
     )
     
-    # Initialize terraform module agent
     terraform_module_agent = TerraformModuleAgent(
         llm_service=llm_service,
         vector_db_service=vector_db_service,
         config={"templates_dir": "templates"}
+    )
+    
+    jira_agent = JiraAgent(
+        llm_service=llm_service,
+        vector_db_service=vector_db_service,
+        config={
+            "templates_dir": "templates",
+            "jira_url": os.environ.get("JIRA_URL"),
+            "jira_username": os.environ.get("JIRA_USERNAME"),
+            "jira_api_token": os.environ.get("JIRA_API_TOKEN")
+        }
+    )
+    
+    confluence_agent = ConfluenceAgent(
+        llm_service=llm_service,
+        vector_db_service=vector_db_service,
+        config={
+            "templates_dir": "templates",
+            "confluence_url": os.environ.get("CONFLUENCE_URL"),
+            "confluence_username": os.environ.get("CONFLUENCE_USERNAME"),
+            "confluence_api_token": os.environ.get("CONFLUENCE_API_TOKEN")
+        }
+    )
+    
+    github_agent = GitHubAgent(
+        llm_service=llm_service,
+        vector_db_service=vector_db_service,
+        config={
+            "templates_dir": "templates",
+            "github_token": os.environ.get("GITHUB_TOKEN"),
+            "github_username": os.environ.get("GITHUB_USERNAME"),
+            "github_org": os.environ.get("GITHUB_ORG")
+        }
+    )
+    
+    nexus_agent = NexusAgent(
+        llm_service=llm_service,
+        vector_db_service=vector_db_service,
+        config={
+            "templates_dir": "templates",
+            "nexus_url": os.environ.get("NEXUS_URL"),
+            "nexus_username": os.environ.get("NEXUS_USERNAME"),
+            "nexus_password": os.environ.get("NEXUS_PASSWORD")
+        }
+    )
+    
+    kubernetes_agent = KubernetesAgent(
+        llm_service=llm_service,
+        vector_db_service=vector_db_service,
+        config={
+            "templates_dir": "templates",
+            "kubeconfig_path": os.environ.get("KUBECONFIG_PATH"),
+            "context": os.environ.get("KUBERNETES_CONTEXT")
+        }
+    )
+    
+    argocd_agent = ArgoCDAgent(
+        llm_service=llm_service,
+        vector_db_service=vector_db_service,
+        config={
+            "templates_dir": "templates",
+            "argocd_server": os.environ.get("ARGOCD_SERVER"),
+            "argocd_username": os.environ.get("ARGOCD_USERNAME"),
+            "argocd_password": os.environ.get("ARGOCD_PASSWORD")
+        }
+    )
+    
+    vault_agent = VaultAgent(
+        llm_service=llm_service,
+        vector_db_service=vector_db_service,
+        config={
+            "templates_dir": "templates",
+            "vault_url": os.environ.get("VAULT_ADDR"),
+            "vault_token": os.environ.get("VAULT_TOKEN"),
+            "vault_namespace": os.environ.get("VAULT_NAMESPACE")
+        }
+    )
+    
+    security_scanner_agent = SecurityScannerAgent(
+        llm_service=llm_service,
+        vector_db_service=vector_db_service,
+        config={
+            "templates_dir": "templates",
+            "checkov_path": os.environ.get("CHECKOV_PATH", "checkov"),
+            "trivy_path": os.environ.get("TRIVY_PATH", "trivy")
+        }
     )
     
     # Register agents in the global store
@@ -313,7 +466,15 @@ async def startup_event():
     agents["architecture"] = architecture_agent
     agents["security"] = security_agent
     agents["cost"] = cost_agent
-    agents["terraform_module"] = terraform_module_agent  # Register terraform module agent
+    agents["terraform_module"] = terraform_module_agent
+    agents["jira"] = jira_agent
+    agents["confluence"] = confluence_agent
+    agents["github"] = github_agent
+    agents["nexus"] = nexus_agent
+    agents["kubernetes"] = kubernetes_agent
+    agents["argocd"] = argocd_agent
+    agents["vault"] = vault_agent
+    agents["security_scanner"] = security_scanner_agent
     
     # Load tasks from file
     load_tasks()
@@ -1153,6 +1314,113 @@ async def download_terraform_module(task_id: str):
             "Content-Disposition": f'attachment; filename="{module_name}.zip"'
         }
     )
+
+# ----- Routes for New Agents -----
+
+@app.post("/api/jira", response_model=Dict[str, Any])
+async def process_jira_request(request: JiraRequest):
+    """Process a Jira-related request."""
+    try:
+        result = await jira_agent.process(request.dict())
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/confluence", response_model=Dict[str, Any])
+async def process_confluence_request(request: ConfluenceRequest):
+    """Process a Confluence-related request."""
+    try:
+        result = await confluence_agent.process(request.dict())
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/github", response_model=Dict[str, Any])
+async def process_github_request(request: GitHubRequest):
+    """Process a GitHub-related request."""
+    try:
+        result = await github_agent.process(request.dict())
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/nexus", response_model=Dict[str, Any])
+async def process_nexus_request(request: NexusRequest):
+    """Process a Nexus-related request."""
+    try:
+        result = await nexus_agent.process(request.dict())
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/kubernetes", response_model=Dict[str, Any])
+async def process_kubernetes_request(request: KubernetesRequest):
+    """Process a Kubernetes-related request."""
+    try:
+        result = await kubernetes_agent.process(request.dict())
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/argocd", response_model=Dict[str, Any])
+async def process_argocd_request(request: ArgoCDRequest):
+    """Process an ArgoCD-related request."""
+    try:
+        result = await argocd_agent.process(request.dict())
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/vault", response_model=Dict[str, Any])
+async def process_vault_request(request: VaultRequest):
+    """Process a Vault-related request."""
+    try:
+        result = await vault_agent.process(request.dict())
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/security-scan", response_model=Dict[str, Any])
+async def process_security_scan_request(request: SecurityScanRequest):
+    """Process a security scanning request."""
+    try:
+        result = await security_scanner_agent.process(request.dict())
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Update the status endpoint to include all agents
+@app.get("/api/status")
+async def get_status():
+    """Get the current status of all agents and the system."""
+    uptime = (datetime.now() - start_time).total_seconds()
+    
+    # Get status of all agents
+    agent_statuses = {}
+    for name, agent in agents.items():
+        try:
+            agent_status = {
+                "id": agent.id,
+                "name": agent.name,
+                "description": agent.description,
+                "capabilities": agent.capabilities,
+                "state": agent.state,
+                "created_time": agent.created_time.isoformat() if hasattr(agent, 'created_time') else None,
+                "last_active_time": agent.last_active_time.isoformat() if hasattr(agent, 'last_active_time') else None,
+                "memory_size": agent.get_memory_size() if hasattr(agent, 'get_memory_size') else None,
+                "has_vector_memory": agent.vector_db_service is not None
+            }
+            agent_statuses[name] = agent_status
+        except Exception as e:
+            logger.error(f"Error getting status for agent {name}: {str(e)}")
+            agent_statuses[name] = {"state": "error", "error": str(e)}
+    
+    return {
+        "status": "running",
+        "agents": agent_statuses,
+        "uptime": uptime,
+        "version": app.version
+    }
 
 # ----- Main function to run the server -----
 
