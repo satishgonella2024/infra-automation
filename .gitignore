@@ -36,3 +36,4 @@ Thumbs.db
 chroma_data/
 ui/react-ui/node_modules/
 ui/react-ui/.npmrc
+# data/chroma/chroma.sqlite3
