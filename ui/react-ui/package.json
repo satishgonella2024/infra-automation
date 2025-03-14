@@ -23,6 +23,7 @@
     "react-router-dom": "^6.11.1",
     "react-scripts": "5.0.1",
     "react-syntax-highlighter": "^15.5.0",
+    "reactflow": "^11.11.4",
     "vis-data": "^7.1.6",
     "vis-network": "^9.1.6",
     "web-vitals": "^2.1.4"

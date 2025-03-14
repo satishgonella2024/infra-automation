@@ -11,6 +11,13 @@ import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 import CostOptimization from './pages/CostOptimization';
 import TerraformModules from './pages/TerraformModules';
+import Jira from './pages/Jira';
+import Confluence from './pages/Confluence';
+import GitHub from './pages/GitHub';
+import Nexus from './pages/Nexus';
+import Kubernetes from './pages/Kubernetes';
+import ArgoCD from './pages/ArgoCD';
+import WorkflowEditor from './pages/WorkflowEditor';
 import { fetchStatus } from './services/api';
 
 function App() {
@@ -86,10 +93,17 @@ function App() {
           <Route path="/generate" element={<InfrastructureGenerator />} />
           <Route path="/security" element={<SecurityReview />} />
           <Route path="/tasks" element={<TaskHistory />} />
-          <Route path="/visualization" element={<Visualization />} />
+          <Route path="/visualize" element={<Visualization />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/cost-optimization" element={<CostOptimization />} />
-          <Route path="/terraform-modules" element={<TerraformModules />} />
+          <Route path="/cost" element={<CostOptimization />} />
+          <Route path="/modules" element={<TerraformModules />} />
+          <Route path="/jira" element={<Jira />} />
+          <Route path="/confluence" element={<Confluence />} />
+          <Route path="/github" element={<GitHub />} />
+          <Route path="/nexus" element={<Nexus />} />
+          <Route path="/kubernetes" element={<Kubernetes />} />
+          <Route path="/argocd" element={<ArgoCD />} />
+          <Route path="/workflow" element={<WorkflowEditor />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Box>

@@ -21,7 +21,8 @@ import {
   MenuItem,
   useTheme,
   useMediaQuery,
-  Chip
+  Chip,
+  ListSubheader
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -36,7 +37,17 @@ import {
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
   ChevronLeft as ChevronLeftIcon,
-  Money as MoneyIcon
+  Money as MoneyIcon,
+  Assignment as JiraIcon,
+  Description as ConfluenceIcon,
+  GitHub as GitHubIcon,
+  Cloud as NexusIcon,
+  CloudQueue as KubernetesIcon,
+  CloudSync as ArgoCDIcon,
+  Storage as StorageIcon,
+  Build as BuildIcon,
+  Analytics as AnalyticsIcon,
+  AccountTree as WorkflowIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 240;
@@ -71,14 +82,52 @@ function Layout({ children, apiStatus }) {
     setNotificationAnchorEl(null);
   };
 
-  const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-    { text: 'Infrastructure Generator', icon: <CodeIcon />, path: '/generate' },
-    { text: 'Security Review', icon: <SecurityIcon />, path: '/security' },
-    { text: 'Cost Optimization', icon: <MoneyIcon />, path: '/cost-optimization' },
-    { text: 'Task History', icon: <HistoryIcon />, path: '/tasks' },
-    { text: 'Visualization', icon: <VisibilityIcon />, path: '/visualization' },
-    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+  // Navigation items grouped by category
+  const navigationItems = [
+    {
+      category: 'Overview',
+      items: [
+        { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+        { text: 'Infrastructure', icon: <CodeIcon />, path: '/infrastructure' },
+        { text: 'Security', icon: <SecurityIcon />, path: '/security' },
+        { text: 'Cost', icon: <MoneyIcon />, path: '/cost' },
+        { text: 'Infrastructure Generator', icon: <CodeIcon />, path: '/generate' },
+        { text: 'Security Review', icon: <SecurityIcon />, path: '/security' },
+        { text: 'Task History', icon: <HistoryIcon />, path: '/tasks' },
+        { text: 'Visualization', icon: <VisibilityIcon />, path: '/visualize' },
+        { text: 'Workflow Editor', icon: <WorkflowIcon />, path: '/workflow' }
+      ]
+    },
+    {
+      category: 'Development',
+      items: [
+        { text: 'Jira', icon: <JiraIcon />, path: '/jira' },
+        { text: 'Confluence', icon: <ConfluenceIcon />, path: '/confluence' },
+        { text: 'GitHub', icon: <GitHubIcon />, path: '/github' }
+      ]
+    },
+    {
+      category: 'DevOps',
+      items: [
+        { text: 'Nexus', icon: <NexusIcon />, path: '/nexus' },
+        { text: 'Kubernetes', icon: <KubernetesIcon />, path: '/kubernetes' },
+        { text: 'ArgoCD', icon: <ArgoCDIcon />, path: '/argocd' }
+      ]
+    },
+    {
+      category: 'Monitoring',
+      items: [
+        { text: 'Observability', icon: <VisibilityIcon />, path: '/observability' },
+        { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' }
+      ]
+    },
+    {
+      category: 'Settings',
+      items: [
+        { text: 'History', icon: <HistoryIcon />, path: '/history' },
+        { text: 'Settings', icon: <SettingsIcon />, path: '/settings' }
+      ]
+    }
   ];
 
   const getStatusColor = (status) => {
@@ -96,60 +145,41 @@ function Layout({ children, apiStatus }) {
 
   const drawer = (
     <div>
-      <Toolbar sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        px: [1]
-      }}>
-        <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
+      <Toolbar>
+        <Typography variant="h6" noWrap component="div">
           Infra Automation
         </Typography>
-        {isMobile && (
-          <IconButton onClick={handleDrawerToggle}>
-            <ChevronLeftIcon />
-          </IconButton>
-        )}
       </Toolbar>
       <Divider />
-      <List>
-        {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding>
-            <ListItemButton
-              selected={location.pathname === item.path}
-              onClick={() => {
-                navigate(item.path);
-                if (isMobile) {
-                  setMobileOpen(false);
-                }
-              }}
-              sx={{
-                '&.Mui-selected': {
-                  backgroundColor: 'rgba(25, 118, 210, 0.08)',
-                  borderLeft: '4px solid',
-                  borderLeftColor: 'primary.main',
-                  '&:hover': {
-                    backgroundColor: 'rgba(25, 118, 210, 0.12)',
-                  },
-                },
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                },
-                pl: location.pathname === item.path ? 2 : 3,
-              }}
-            >
-              <ListItemIcon
-                sx={{
-                  color: location.pathname === item.path ? 'primary.main' : 'inherit',
-                }}
-              >
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
+      {navigationItems.map(({ category, items }) => (
+        <React.Fragment key={category}>
+          <List
+            subheader={
+              <ListSubheader component="div" id={`${category}-subheader`}>
+                {category}
+              </ListSubheader>
+            }
+          >
+            {items.map(({ text, icon, path }) => (
+              <ListItem key={text} disablePadding>
+                <ListItemButton
+                  selected={location.pathname === path}
+                  onClick={() => {
+                    navigate(path);
+                    if (isMobile) {
+                      setMobileOpen(false);
+                    }
+                  }}
+                >
+                  <ListItemIcon>{icon}</ListItemIcon>
+                  <ListItemText primary={text} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+          <Divider />
+        </React.Fragment>
+      ))}
       <Divider />
       <Box sx={{ p: 2 }}>
         <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -205,7 +235,7 @@ function Layout({ children, apiStatus }) {
             component="div"
             sx={{ display: { xs: 'none', sm: 'block' }, flexGrow: 1 }}
           >
-            {menuItems.find((item) => item.path === location.pathname)?.text || 'Not Found'}
+            {navigationItems.find((item) => item.items.find((i) => i.path === location.pathname))?.items.find((i) => i.path === location.pathname)?.text || 'Not Found'}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Tooltip title="Toggle light/dark mode">

@@ -14,30 +14,64 @@ import {
   Architecture as ArchitectureIcon,
   Security as SecurityIcon,
   AttachMoney as MoneyIcon,
-  Storage as StorageIcon
+  Storage as StorageIcon,
+  Assignment as JiraIcon,
+  Description as ConfluenceIcon,
+  GitHub as GitHubIcon,
+  Cloud as NexusIcon,
+  CloudQueue as KubernetesIcon,
+  CloudSync as ArgoCDIcon,
+  Warning as WarningIcon,
+  Error as ErrorIcon,
+  CheckCircle as CheckCircleIcon,
+  HourglassEmpty as HourglassIcon
 } from '@mui/icons-material';
 
-const AgentStatus = ({ agents }) => {
+const AgentStatus = ({ agents = [] }) => {
   // Helper function to get agent icon
-  const getAgentIcon = (agentType) => {
-    const type = agentType.toLowerCase();
-    if (type.includes('infrastructure')) return <CodeIcon />;
-    if (type.includes('architect')) return <ArchitectureIcon />;
-    if (type.includes('security')) return <SecurityIcon />;
-    if (type.includes('cost')) return <MoneyIcon />;
-    if (type.includes('terraform')) return <StorageIcon />;
+  const getAgentIcon = (agentName, capabilities) => {
+    if (!agentName) return <CodeIcon />;
+    const name = String(agentName || '').toLowerCase();
+    
+    // Check capabilities first for more accurate icon selection
+    if (capabilities?.includes('terraform_generation')) return <StorageIcon />;
+    if (capabilities?.includes('cost_estimation')) return <MoneyIcon />;
+    
+    // Fall back to name-based icon selection
+    if (name.includes('infrastructure')) return <CodeIcon />;
+    if (name.includes('architect')) return <ArchitectureIcon />;
+    if (name.includes('security')) return <SecurityIcon />;
+    if (name.includes('jira')) return <JiraIcon />;
+    if (name.includes('confluence')) return <ConfluenceIcon />;
+    if (name.includes('github')) return <GitHubIcon />;
+    if (name.includes('nexus')) return <NexusIcon />;
+    if (name.includes('kubernetes')) return <KubernetesIcon />;
+    if (name.includes('argocd')) return <ArgoCDIcon />;
     return <CodeIcon />;
   };
 
-  // Helper function to get status color
-  const getStatusColor = (status) => {
-    if (!status) return 'default';
+  // Helper function to get status info
+  const getStatusInfo = (state) => {
+    if (!state) return { icon: <WarningIcon />, color: 'default', label: 'Unknown' };
     
-    status = status.toLowerCase();
-    if (status === 'idle' || status === 'online' || status === 'running') return 'success';
-    if (status === 'processing' || status === 'busy') return 'warning';
-    if (status === 'error' || status === 'offline') return 'error';
-    return 'default';
+    const stateStr = String(state || '').toLowerCase();
+    switch (stateStr) {
+      case 'healthy':
+      case 'running':
+      case 'idle':
+        return { icon: <CheckCircleIcon />, color: 'success', label: 'Running' };
+      case 'error':
+      case 'unhealthy':
+        return { icon: <ErrorIcon />, color: 'error', label: 'Error' };
+      case 'degraded':
+      case 'missing_dependencies':
+        return { icon: <WarningIcon />, color: 'warning', label: 'Degraded' };
+      case 'not_initialized':
+      case 'starting':
+        return { icon: <HourglassIcon />, color: 'info', label: 'Starting' };
+      default:
+        return { icon: <WarningIcon />, color: 'default', label: stateStr };
+    }
   };
 
   // Check if agents is an array or an object
@@ -53,7 +87,9 @@ const AgentStatus = ({ agents }) => {
 
   // Helper function to get agent description (used for object format)
   const getAgentDescription = (agentType) => {
-    switch (agentType.toLowerCase()) {
+    if (!agentType) return 'AI agent for infrastructure automation';
+    
+    switch (String(agentType).toLowerCase()) {
       case 'infrastructure':
         return 'Generates infrastructure as code based on requirements';
       case 'architecture':
@@ -118,7 +154,7 @@ const AgentStatus = ({ agents }) => {
                     </Typography>
                     <Chip
                       label={agent.status || 'unknown'}
-                      color={getStatusColor(agent.status)}
+                      color={getStatusInfo(agent.status).color}
                       size="small"
                     />
                   </Box>

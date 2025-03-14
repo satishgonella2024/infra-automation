@@ -9,9 +9,15 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./src:/app/src:delegated
-      - chroma_data:/app/chroma_data:delegated
-      - ./data:/app/data:delegated
+      - type: bind
+        source: ./src
+        target: /app/src
+      - type: volume
+        source: chroma_data
+        target: /app/chroma_data
+      - type: bind
+        source: ./data
+        target: /app/data
     environment:
       - LLM_PROVIDER=ollama
       - LLM_MODEL=llama3
@@ -53,8 +59,12 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - ./src:/app/src
-      - ./test-results:/app/test-results
+      - type: bind
+        source: ./src
+        target: /app/src
+      - type: bind
+        source: ./test-results
+        target: /app/test-results
     environment:
       - LLM_PROVIDER=ollama
       - LLM_MODEL=llama3
