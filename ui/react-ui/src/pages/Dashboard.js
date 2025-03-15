@@ -30,14 +30,16 @@ import {
   Memory,
   Storage,
   Speed,
-  Memory as GpuIcon
+  Memory as GpuIcon,
+  Computer as EnvironmentsIcon
 } from '@mui/icons-material';
-import { fetchTasks } from '../services/api';
+import { fetchTasks, fetchEnvironments } from '../services/api';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
 import LoadingIndicator from '../components/LoadingIndicator';
 import AgentStatus from '../components/AgentStatus';
 import { formatDistanceToNow } from 'date-fns';
+import { Link } from '@mui/material';
 
 // Register Chart.js components
 ChartJS.register(ArcElement, ChartTooltip, Legend);
@@ -75,6 +77,8 @@ function Dashboard({ apiStatus }) {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [environments, setEnvironments] = useState([]);
+  const [environmentsLoading, setEnvironmentsLoading] = useState(true);
   const [stats, setStats] = useState({
     total: 0,
     successful: 0,
@@ -87,8 +91,12 @@ function Dashboard({ apiStatus }) {
   // Load tasks on component mount
   useEffect(() => {
     loadTasks();
+    loadEnvironments();
     // Set up polling to refresh tasks every 30 seconds
-    const interval = setInterval(loadTasks, 30000);
+    const interval = setInterval(() => {
+      loadTasks();
+      loadEnvironments();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -138,6 +146,19 @@ function Dashboard({ apiStatus }) {
       console.error('Failed to fetch tasks:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load environments from API
+  const loadEnvironments = async () => {
+    try {
+      setEnvironmentsLoading(true);
+      const data = await fetchEnvironments();
+      setEnvironments(data.environments || []);
+    } catch (error) {
+      console.error('Failed to fetch environments:', error);
+    } finally {
+      setEnvironmentsLoading(false);
     }
   };
 
@@ -733,9 +754,11 @@ function Dashboard({ apiStatus }) {
           <Grid item xs={12} sm={6} md={3}>
             <MetricCard
               title="GPU Usage"
-              value="N/A"
+              value={metrics.gpu_usage ? formatPercent(metrics.gpu_usage.utilization_percent) : 'N/A'}
               icon={<GpuIcon color="primary" />}
-              tooltip="GPU metrics not available"
+              tooltip={metrics.gpu_usage 
+                ? `GPU Memory: ${formatBytes(metrics.gpu_usage.memory_used_gb * 1024 * 1024 * 1024)} / ${formatBytes(metrics.gpu_usage.memory_total_gb * 1024 * 1024 * 1024)}`
+                : "GPU metrics not available"}
             />
           </Grid>
         )}
@@ -811,6 +834,90 @@ function Dashboard({ apiStatus }) {
       )}
 
       {metrics && metrics.agents && <AgentStatus agents={metrics.agents} />}
+
+      {/* Environments Section */}
+      <Box mt={6}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h5" component="h2">
+            Development Environments
+          </Typography>
+          <Button
+            variant="outlined"
+            endIcon={<ArrowForwardIcon />}
+            onClick={() => navigate('/environments')}
+          >
+            View All
+          </Button>
+        </Box>
+        
+        {environmentsLoading ? (
+          <Box display="flex" justifyContent="center" p={3}>
+            <CircularProgress />
+          </Box>
+        ) : environments.length === 0 ? (
+          <Paper sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="body1" color="textSecondary">
+              No environments found. Create your first environment to get started.
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<EnvironmentsIcon />}
+              onClick={() => navigate('/environments')}
+              sx={{ mt: 2 }}
+            >
+              Create Environment
+            </Button>
+          </Paper>
+        ) : (
+          <Grid container spacing={3}>
+            {environments.slice(0, 3).map((env) => (
+              <Grid item xs={12} md={4} key={env.environment_id}>
+                <Card sx={{ height: '100%' }}>
+                  <CardContent>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                      <Typography variant="h6" component="div">
+                        {env.environment_name}
+                      </Typography>
+                      <Chip 
+                        label={env.status} 
+                        color={
+                          env.status === 'running' ? 'success' : 
+                          env.status === 'failed' ? 'error' : 
+                          'warning'
+                        }
+                        size="small" 
+                      />
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Type: {env.environment_type}
+                    </Typography>
+                    {env.ready && env.access_url && (
+                      <Typography variant="body2" gutterBottom>
+                        Access: <Link href={env.access_url} target="_blank" rel="noopener noreferrer">
+                          Dashboard
+                        </Link>
+                      </Typography>
+                    )}
+                    {env.ready && env.tool_endpoints && (
+                      <Typography variant="body2">
+                        Tools: {Object.keys(env.tool_endpoints).filter(t => t !== 'dashboard').length}
+                      </Typography>
+                    )}
+                  </CardContent>
+                  <CardActions>
+                    <Button 
+                      size="small" 
+                      onClick={() => navigate('/environments')}
+                    >
+                      View Details
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+      </Box>
     </Box>
   );
 }

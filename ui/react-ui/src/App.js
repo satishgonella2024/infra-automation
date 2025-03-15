@@ -18,6 +18,7 @@ import Nexus from './pages/Nexus';
 import Kubernetes from './pages/Kubernetes';
 import ArgoCD from './pages/ArgoCD';
 import WorkflowEditor from './pages/WorkflowEditor';
+import Environments from './pages/Environments';
 import { fetchStatus } from './services/api';
 
 function App() {
@@ -104,6 +105,7 @@ function App() {
           <Route path="/kubernetes" element={<Kubernetes />} />
           <Route path="/argocd" element={<ArgoCD />} />
           <Route path="/workflow" element={<WorkflowEditor />} />
+          <Route path="/environments" element={<Environments />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Box>

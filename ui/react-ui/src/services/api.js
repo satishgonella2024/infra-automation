@@ -55,12 +55,23 @@ createAxiosWithRetry(api);
 // API endpoints
 export const fetchStatus = async () => {
   try {
-    const response = await api.get('/status', {
+    const response = await api.get('/api/status', {
       timeout: 30000, // 30 second timeout
       retries: 2,     // Allow 2 retries
       retryDelay: 1000 // Wait 1 second between retries
     });
-    return response.data;
+    
+    // Ensure we have a valid status object with the correct structure
+    const data = response.data;
+    return {
+      status: data.status || 'running',
+      agents: Object.entries(data.agents || {}).map(([key, agent]) => ({
+        name: agent.name || key,
+        status: agent.state || 'unknown'
+      })),
+      uptime_seconds: data.uptime || 0,
+      version: data.version || '0.0.0'
+    };
   } catch (error) {
     console.error('Error fetching status:', error);
     // Return a more detailed offline status
@@ -199,6 +210,61 @@ export const downloadTerraformModule = async (taskId) => {
     return true;
   } catch (error) {
     console.error('Failed to download Terraform module:', error);
+    throw error;
+  }
+};
+
+// Environment API endpoints
+export const fetchEnvironments = async (userId = null) => {
+  try {
+    let url = '/api/onboarding/environments';
+    if (userId) {
+      url += `?user_id=${userId}`;
+    }
+    const response = await api.get(url);
+    return response.data;
+  } catch (error) {
+    console.error('Failed to fetch environments:', error);
+    return { environments: [], count: 0 }; // Return empty array on error
+  }
+};
+
+export const fetchEnvironmentDetails = async (environmentId) => {
+  try {
+    const response = await api.get(`/api/onboarding/environments/${environmentId}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Failed to fetch environment ${environmentId}:`, error);
+    throw error;
+  }
+};
+
+export const fetchEnvironmentCredentials = async (environmentId) => {
+  try {
+    const response = await api.get(`/api/onboarding/environments/${environmentId}/credentials`);
+    return response.data;
+  } catch (error) {
+    console.error(`Failed to fetch credentials for environment ${environmentId}:`, error);
+    throw error;
+  }
+};
+
+export const createEnvironment = async (environmentData) => {
+  try {
+    const response = await api.post('/api/onboarding/new-environment', environmentData);
+    return response.data;
+  } catch (error) {
+    console.error('Failed to create environment:', error);
+    throw error;
+  }
+};
+
+export const deleteEnvironment = async (environmentId) => {
+  try {
+    const response = await api.delete(`/api/onboarding/environments/${environmentId}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Failed to delete environment ${environmentId}:`, error);
     throw error;
   }
 };

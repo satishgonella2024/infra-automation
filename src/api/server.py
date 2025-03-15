@@ -12,6 +12,7 @@ import asyncio
 import subprocess
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Union
+import time
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Query
@@ -39,6 +40,9 @@ from src.services.llm import LLMService
 from src.services.vector_db import ChromaService
 from src.agents.vault import VaultAgent
 from src.agents.security_scanner import SecurityScannerAgent
+from src.agents.deployment import DeploymentAgent
+from src.agents.onboarding import OnboardingAgent
+from src.models.onboarding import OnboardingRequest, OnboardingResponse, ToolType, EnvironmentType
 
 # Create the FastAPI app
 app = FastAPI(
@@ -230,6 +234,14 @@ class SecurityScanRequest(BaseModel):
     """Request model for security scanning."""
     action: str = Field(..., description="Action to perform (scan_iac, scan_container, etc.)")
     parameters: Dict[str, Any] = Field(..., description="Parameters for the scan")
+    task_id: Optional[str] = Field(None, description="Optional task ID for tracking")
+
+class DeploymentRequest(BaseModel):
+    """Request model for deployment operations."""
+    action: str = Field(..., description="Action to perform (deploy, update, rollback, etc.)")
+    deployment_config: Dict[str, Any] = Field(..., description="Deployment configuration")
+    cloud_provider: str = Field(default="aws", description="Target cloud provider (aws, azure, gcp)")
+    task_id: Optional[str] = Field(None, description="Optional task ID for tracking")
 
 # ----- Globals and initialization -----
 
@@ -317,13 +329,18 @@ kubernetes_agent = None
 argocd_agent = None
 vault_agent = None
 security_scanner_agent = None
+deployment_agent = None
+onboarding_agent = None
+
+# Initialize agents dictionary
+agents = {}
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize the system on startup."""
     global llm_service, vector_db_service, infrastructure_agent, architecture_agent, security_agent, cost_agent, \
            terraform_module_agent, jira_agent, confluence_agent, github_agent, nexus_agent, kubernetes_agent, argocd_agent, \
-           vault_agent, security_scanner_agent
+           vault_agent, security_scanner_agent, deployment_agent, onboarding_agent, agents
     
     # Get LLM configuration from environment variables
     llm_provider = os.environ.get("LLM_PROVIDER", "ollama")
@@ -347,12 +364,6 @@ async def startup_event():
     # Create ChromaDB service
     vector_db_service = ChromaService(config={"db_path": chroma_db_path})
 
-    # Add this
-    integrated_systems = integrate_systems(app, agents)
-    
-    # Add background task to run initialization
-    asyncio.create_task(run_initialization_tasks(agents))
-    
     # Create and register agents
     infrastructure_agent = InfrastructureAgent(
         llm_service=llm_service,
@@ -470,6 +481,23 @@ async def startup_event():
         }
     )
     
+    deployment_agent = DeploymentAgent(
+        llm_service=llm_service,
+        vector_db_service=vector_db_service,
+        config={
+            "templates_dir": "templates"
+        }
+    )
+    
+    onboarding_agent = OnboardingAgent(
+        llm_service=llm_service,
+        vector_db_service=vector_db_service,
+        config={
+            "templates_dir": "templates",
+            "environments_dir": "/app/data/environments"
+        }
+    )
+    
     # Register agents in the global store
     agents["infrastructure"] = infrastructure_agent
     agents["architecture"] = architecture_agent
@@ -484,6 +512,18 @@ async def startup_event():
     agents["argocd"] = argocd_agent
     agents["vault"] = vault_agent
     agents["security_scanner"] = security_scanner_agent
+    agents["deployment"] = deployment_agent
+    agents["onboarding"] = onboarding_agent
+    
+    # Now that all agents are initialized, integrate the systems
+    integrated_systems = integrate_systems(app, agents)
+    
+    # Manually include workflow API routes
+    from src.workflow.api import router as workflow_router
+    app.include_router(workflow_router)
+    
+    # Add background task to run initialization
+    asyncio.create_task(run_initialization_tasks(agents))
     
     # Load tasks from file
     load_tasks()
@@ -501,80 +541,58 @@ async def root():
     }
 
 @app.get("/status")
-async def get_status() -> Dict[str, Any]:
-    """
-    Get the current status of the server and all registered agents.
-    
-    Returns:
-        A dictionary containing server status information and agent states
-    """
-    try:
-        # Calculate uptime
-        uptime_seconds = (datetime.now() - start_time).total_seconds()
-        
-        # Get agent statuses
-        agent_statuses = []
-        for agent_name, agent in agents.items():
-            try:
-                agent_status = agent.serialize()
-                agent_statuses.append(agent_status)
-            except Exception as e:
-                print(f"Error getting status for agent {agent_name}: {str(e)}")
-                # Add a fallback status for the failed agent
-                agent_statuses.append({
-                    "id": "unknown",
-                    "name": agent_name,
-                    "description": "Agent status unavailable",
-                    "state": "error",
-                    "status": "error",
-                    "error": str(e)
-                })
-        
-        return {
-            "status": "online",
-            "version": "1.0.0",
-            "uptime_seconds": uptime_seconds,
-            "agents": agent_statuses,
-            "tasks_count": len(tasks),
-            "last_task_time": get_last_task_time(tasks, start_time)
-        }
-    except Exception as e:
-        print(f"Error getting system status: {str(e)}")
-        return {
-            "status": "error",
-            "version": "1.0.0",
-            "error": str(e),
-            "uptime_seconds": 0,
-            "agents": [],
-            "tasks_count": 0
-        }
+async def status_redirect():
+    """Redirect to /api/status for backward compatibility."""
+    return await get_status()
 
-def get_last_task_time(tasks, default_time):
-    """Get the most recent task timestamp, handling string and datetime formats."""
-    try:
-        # Filter out None timestamps and convert string timestamps to datetime objects
-        valid_timestamps = []
-        for task in tasks.values():
-            timestamp = task.get("timestamp")
-            if timestamp:
-                # If timestamp is a string, convert to datetime
-                if isinstance(timestamp, str):
-                    try:
-                        timestamp = datetime.fromisoformat(timestamp)
-                        valid_timestamps.append(timestamp)
-                    except ValueError:
-                        # Skip invalid timestamp formats
-                        pass
-                elif isinstance(timestamp, datetime):
-                    valid_timestamps.append(timestamp)
-        
-        # Get the max timestamp if there are any valid ones
-        if valid_timestamps:
-            return max(valid_timestamps)
-        return default_time
-    except Exception as e:
-        print(f"Error getting last task time: {str(e)}")
-        return default_time
+@app.get("/api/status")
+async def get_status():
+    """Get the current status of all agents and the system."""
+    # Calculate uptime using datetime objects
+    uptime_seconds = (datetime.now() - start_time).total_seconds()
+    
+    # Get status of all agents
+    agent_statuses = {}
+    for name, agent in agents.items():
+        try:
+            # Get last active time as ISO format string if it's a datetime, otherwise use the value as is
+            last_active_time = None
+            if hasattr(agent, 'last_active_time'):
+                if isinstance(agent.last_active_time, datetime):
+                    last_active_time = agent.last_active_time.isoformat()
+                else:
+                    last_active_time = agent.last_active_time
+            
+            # Get created time as ISO format string if it's a datetime, otherwise use the value as is
+            created_time = None
+            if hasattr(agent, 'created_time'):
+                if isinstance(agent.created_time, datetime):
+                    created_time = agent.created_time.isoformat()
+                else:
+                    created_time = agent.created_time
+            
+            agent_status = {
+                "id": getattr(agent, "id", "unknown"),
+                "name": getattr(agent, "name", name),
+                "description": getattr(agent, "description", ""),
+                "capabilities": getattr(agent, "capabilities", []),
+                "state": getattr(agent, "state", "unknown"),
+                "created_time": created_time,
+                "last_active_time": last_active_time,
+                "memory_size": getattr(agent, "get_memory_size", lambda: None)() if hasattr(agent, 'get_memory_size') else None,
+                "has_vector_memory": agent.vector_db_service is not None
+            }
+            agent_statuses[name] = agent_status
+        except Exception as e:
+            print(f"Error getting status for agent {name}: {str(e)}")
+            agent_statuses[name] = {"state": "error", "error": str(e)}
+    
+    return {
+        "status": "running",
+        "agents": agent_statuses,
+        "uptime": uptime_seconds,
+        "version": app.version
+    }
 
 @app.post("/infrastructure/generate", response_model=InfrastructureResponse)
 async def generate_infrastructure(request: InfrastructureRequest):
@@ -1391,45 +1409,313 @@ async def process_vault_request(request: VaultRequest):
 
 @app.post("/api/security-scan", response_model=Dict[str, Any])
 async def process_security_scan_request(request: SecurityScanRequest):
-    """Process a security scanning request."""
+    """Process a security scan request."""
+    task_id = request.task_id or str(uuid.uuid4())
+    result = await security_scanner_agent.process({
+        "action": request.action,
+        "parameters": request.parameters,
+        "task_id": task_id
+    })
+    return result
+
+@app.post("/api/deployment", response_model=Dict[str, Any])
+async def process_deployment_request(request: DeploymentRequest):
+    """Process a deployment request."""
+    task_id = request.task_id or str(uuid.uuid4())
+    
+    # Create a workflow state from the request
+    from src.models.workflow import WorkflowState
+    from src.models.deployment import DeploymentConfig
+    
+    # Convert the deployment_config dict to a DeploymentConfig object
+    deployment_config = DeploymentConfig(**request.deployment_config)
+    
+    # Create a workflow state
+    workflow_state = WorkflowState(
+        workflow_id=task_id,
+        user_id="api_user",
+        template_id="api_template",
+        status="initialized",
+        deployment_config=deployment_config,
+        inputs={}
+    )
+    
+    # Process the request based on the action
+    if request.action == "deploy":
+        # Switch provider if needed
+        if deployment_agent.cloud_provider_name != request.cloud_provider:
+            deployment_agent.switch_provider(request.cloud_provider)
+        
+        # Execute the deployment workflow
+        updated_workflow_state = await deployment_agent.execute_workflow_step(workflow_state)
+        
+        # Save the task
+        tasks[task_id] = {
+            "id": task_id,
+            "type": "deployment",
+            "status": updated_workflow_state.status,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+            "result": {
+                "deployment_status": updated_workflow_state.deployment_status,
+                "resource_endpoints": updated_workflow_state.resource_endpoints,
+                "errors": updated_workflow_state.errors
+            }
+        }
+        save_tasks()
+        
+        return {
+            "task_id": task_id,
+            "status": updated_workflow_state.status,
+            "deployment_status": updated_workflow_state.deployment_status,
+            "resource_endpoints": updated_workflow_state.resource_endpoints,
+            "errors": updated_workflow_state.errors
+        }
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported action: {request.action}")
+
+@app.post("/api/onboarding/new-environment", response_model=OnboardingResponse)
+async def create_new_environment(request: OnboardingRequest):
+    """Create a new complete development environment with all necessary tools."""
+    if "onboarding" not in agents:
+        raise HTTPException(
+            status_code=503,
+            detail="Onboarding Agent is not available"
+        )
+    
     try:
-        result = await security_scanner_agent.process(request.dict())
+        # Process the request with the onboarding agent
+        result = await agents["onboarding"].process({
+            "action": "create_environment",
+            "environment_name": request.environment_name,
+            "environment_type": request.environment_type,
+            "user_id": request.user_id,
+            "tools": request.tools,
+            "custom_domain": request.custom_domain,
+            "resource_limits": request.resource_limits,
+            "description": request.description
+        })
+        
+        # Return the response
+        return OnboardingResponse(
+            environment_id=result.get("environment_id", ""),
+            status=result.get("status", "unknown"),
+            access_url=result.get("access_url"),
+            ready=result.get("ready", False),
+            message=result.get("message", ""),
+            tool_endpoints=result.get("tool_endpoints", {}),
+            credentials_path=f"/api/onboarding/environments/{result.get('environment_id', '')}/credentials"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating environment: {str(e)}"
+        )
+
+@app.get("/api/onboarding/environments", response_model=Dict[str, Any])
+async def list_environments(user_id: Optional[str] = Query(None)):
+    """List all environments, optionally filtered by user_id."""
+    if "onboarding" not in agents:
+        raise HTTPException(
+            status_code=503,
+            detail="Onboarding Agent is not available"
+        )
+    
+    try:
+        # Process the request with the onboarding agent
+        result = await agents["onboarding"].process({
+            "action": "list_environments",
+            "user_id": user_id
+        })
+        
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error listing environments: {str(e)}"
+        )
 
-# Update the status endpoint to include all agents
-@app.get("/api/status")
-async def get_status():
-    """Get the current status of all agents and the system."""
-    uptime = (datetime.now() - start_time).total_seconds()
+@app.get("/api/onboarding/environments/{environment_id}", response_model=Dict[str, Any])
+async def get_environment(environment_id: str):
+    """Get information about an environment."""
+    if "onboarding" not in agents:
+        raise HTTPException(
+            status_code=503,
+            detail="Onboarding Agent is not available"
+        )
     
-    # Get status of all agents
-    agent_statuses = {}
-    for name, agent in agents.items():
-        try:
-            agent_status = {
-                "id": agent.id,
-                "name": agent.name,
-                "description": agent.description,
-                "capabilities": agent.capabilities,
-                "state": agent.state,
-                "created_time": agent.created_time.isoformat() if hasattr(agent, 'created_time') else None,
-                "last_active_time": agent.last_active_time.isoformat() if hasattr(agent, 'last_active_time') else None,
-                "memory_size": agent.get_memory_size() if hasattr(agent, 'get_memory_size') else None,
-                "has_vector_memory": agent.vector_db_service is not None
+    try:
+        # Process the request with the onboarding agent
+        result = await agents["onboarding"].process({
+            "action": "get_environment",
+            "environment_id": environment_id
+        })
+        
+        if result.get("status") == "error":
+            raise HTTPException(
+                status_code=404,
+                detail=result.get("message", f"Environment {environment_id} not found")
+            )
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting environment: {str(e)}"
+        )
+
+@app.delete("/api/onboarding/environments/{environment_id}", response_model=Dict[str, Any])
+async def delete_environment(environment_id: str):
+    """Delete an environment."""
+    if "onboarding" not in agents:
+        raise HTTPException(
+            status_code=503,
+            detail="Onboarding Agent is not available"
+        )
+    
+    try:
+        # Process the request with the onboarding agent
+        result = await agents["onboarding"].process({
+            "action": "delete_environment",
+            "environment_id": environment_id
+        })
+        
+        if result.get("status") == "error":
+            raise HTTPException(
+                status_code=404,
+                detail=result.get("message", f"Environment {environment_id} not found")
+            )
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error deleting environment: {str(e)}"
+        )
+
+@app.get("/api/onboarding/environments/{environment_id}/credentials", response_model=Dict[str, Any])
+async def get_environment_credentials(environment_id: str):
+    """Get credentials for an environment."""
+    if "onboarding" not in agents:
+        raise HTTPException(
+            status_code=503,
+            detail="Onboarding Agent is not available"
+        )
+    
+    try:
+        # Get environment information
+        result = await agents["onboarding"].process({
+            "action": "get_environment",
+            "environment_id": environment_id
+        })
+        
+        if result.get("status") == "error":
+            raise HTTPException(
+                status_code=404,
+                detail=result.get("message", f"Environment {environment_id} not found")
+            )
+        
+        # Extract credentials
+        environment = agents["onboarding"].environments.get(environment_id, {})
+        credentials = environment.get("credentials", {})
+        
+        return {
+            "environment_id": environment_id,
+            "environment_name": environment.get("environment_name", ""),
+            "credentials": credentials
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting environment credentials: {str(e)}"
+        )
+
+# Mock workflow endpoints
+@app.get("/api/workflows/instances")
+async def mock_workflow_instances():
+    """Mock endpoint for workflow instances."""
+    return []
+
+@app.get("/api/workflows/agents")
+async def mock_workflow_agents():
+    """Mock endpoint for workflow agents."""
+    return {}
+
+@app.get("/api/workflows")
+async def mock_workflow_definitions():
+    """Mock endpoint for workflow definitions."""
+    return []
+
+@app.get("/api/workflows/templates")
+async def mock_workflow_templates():
+    """Mock endpoint for workflow templates."""
+    return ["infrastructure_pipeline", "terraform_to_k8s", "security_review", "empty"]
+
+@app.get("/api/workflows/templates/{template_type}/schema")
+async def mock_workflow_template_schema(template_type: str):
+    """Mock endpoint for workflow template schema."""
+    # Return a basic schema based on the template type
+    if template_type == "infrastructure_pipeline":
+        return {
+            "name": "Infrastructure Pipeline",
+            "description": "Generate, review, and deploy infrastructure with security and cost optimization",
+            "parameters": {
+                "cloud_provider": {
+                    "type": "string",
+                    "default": "aws",
+                    "enum": ["aws", "azure", "gcp"],
+                    "description": "Target cloud provider"
+                },
+                "iac_type": {
+                    "type": "string",
+                    "default": "terraform",
+                    "enum": ["terraform", "cloudformation", "bicep"],
+                    "description": "Infrastructure as Code type"
+                }
             }
-            agent_statuses[name] = agent_status
-        except Exception as e:
-            logger.error(f"Error getting status for agent {name}: {str(e)}")
-            agent_statuses[name] = {"state": "error", "error": str(e)}
-    
-    return {
-        "status": "running",
-        "agents": agent_statuses,
-        "uptime": uptime,
-        "version": app.version
-    }
+        }
+    elif template_type == "terraform_to_k8s":
+        return {
+            "name": "Terraform to Kubernetes Pipeline",
+            "description": "Generate Terraform code and deploy to Kubernetes",
+            "parameters": {
+                "cluster_name": {
+                    "type": "string",
+                    "default": "my-cluster",
+                    "description": "Kubernetes cluster name"
+                },
+                "namespace": {
+                    "type": "string",
+                    "default": "default",
+                    "description": "Kubernetes namespace"
+                }
+            }
+        }
+    elif template_type == "security_review":
+        return {
+            "name": "Security Review Pipeline",
+            "description": "Review infrastructure for security issues",
+            "parameters": {
+                "compliance_framework": {
+                    "type": "string",
+                    "default": "cis",
+                    "enum": ["cis", "hipaa", "pci-dss", "nist"],
+                    "description": "Compliance framework to check against"
+                }
+            }
+        }
+    else:
+        return {
+            "name": "Empty Workflow",
+            "description": "Start with an empty workflow",
+            "parameters": {}
+        }
 
 # ----- Main function to run the server -----
 

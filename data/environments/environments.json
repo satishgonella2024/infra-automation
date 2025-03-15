@@ -1,0 +1,57 @@
+{
+  "1f4b036b-8ef6-4081-80df-cae3715c1b67": {
+    "environment_id": "1f4b036b-8ef6-4081-80df-cae3715c1b67",
+    "environment_name": "dev-test-2",
+    "environment_type": "development",
+    "user_id": "user123",
+    "tools": [
+      "jira",
+      "gitlab",
+      "jenkins"
+    ],
+    "custom_domain": "dev-test-2.local",
+    "resource_limits": {
+      "cpu": 2,
+      "memory": "4Gi"
+    },
+    "description": "Test development environment",
+    "created_at": "2025-03-15T03:58:14.328778",
+    "status": "running",
+    "tool_endpoints": {
+      "jira": "http://localhost:8582",
+      "gitlab": "http://localhost:8255",
+      "jenkins": "http://localhost:8790",
+      "dashboard": "http://localhost:8080/dashboard"
+    },
+    "credentials": {
+      "jira": {
+        "username": "admin",
+        "password": "admin"
+      },
+      "confluence": {
+        "username": "admin",
+        "password": "admin"
+      },
+      "gitlab": {
+        "username": "root",
+        "password": "password"
+      },
+      "jenkins": {
+        "username": "admin",
+        "initial_password_file": "/var/jenkins_home/secrets/initialAdminPassword"
+      },
+      "nexus": {
+        "username": "admin",
+        "password": "admin123"
+      },
+      "vault": {
+        "token": "vault_token"
+      },
+      "grafana": {
+        "username": "admin",
+        "password": "admin"
+      }
+    },
+    "access_url": "http://localhost:8080/dashboard"
+  }
+}

@@ -47,7 +47,8 @@ import {
   Storage as StorageIcon,
   Build as BuildIcon,
   Analytics as AnalyticsIcon,
-  AccountTree as WorkflowIcon
+  AccountTree as WorkflowIcon,
+  Computer as EnvironmentsIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 240;
@@ -95,7 +96,8 @@ function Layout({ children, apiStatus }) {
         { text: 'Security Review', icon: <SecurityIcon />, path: '/security' },
         { text: 'Task History', icon: <HistoryIcon />, path: '/tasks' },
         { text: 'Visualization', icon: <VisibilityIcon />, path: '/visualize' },
-        { text: 'Workflow Editor', icon: <WorkflowIcon />, path: '/workflow' }
+        { text: 'Workflow Editor', icon: <WorkflowIcon />, path: '/workflow' },
+        { text: 'Environments', icon: <EnvironmentsIcon />, path: '/environments' }
       ]
     },
     {

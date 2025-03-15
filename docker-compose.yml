@@ -17,12 +17,18 @@ services:
       - type: bind
         source: ./data
         target: /app/data
+      # Add Docker socket mount for host machine deployment
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Add shared volume for environments
+      - environments_data:/app/data/environments
     environment:
       - LLM_PROVIDER=ollama
       - LLM_MODEL=llama3
       - LLM_API_BASE=http://172.17.0.1:11434
       - CHROMA_DB_PATH=/app/chroma_data
       - PYTHONPATH=/app
+      # Add environment variable for host deployment
+      - HOST_DEPLOYMENT=true
     networks:
       - infra_network
     restart: unless-stopped
@@ -92,4 +98,7 @@ networks:
     
 volumes:
   chroma_data:
+    driver: local
+  # Add volume for environments
+  environments_data:
     driver: local

@@ -6192,5 +6192,565 @@
     "improved_code": "```terraform\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env_name\" {\n  type = string\n}\n\nvariable \"eks_cluster_name\" {\n  type = string\n}\n\nvariable \"rds_instance_type\" {\n  type = string\n}\n\noutput \"eks_cluster_endpoint\" {\n  value = aws_eks_cluster.main.endpoint\n}\n\noutput \"rds_instance_address\" {\n  value = aws_db_instance.rds.address\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_subnet\" \"private\" {\n  cidr_block = \"10.0.2.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_eks_cluster\" \"main\" {\n  name     = var.eks_cluster_name\n  role_arn = aws_iam_role.eks_cluster.arn\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_iam_role\" \"eks_cluster\" {\n  name        = \"${var.eks_cluster_name}-cluster\"\n  description = \"EKS cluster role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"eks.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy\" \"eks_cluster\" {\n  name        = \"${var.eks_cluster_name}-cluster-policy\"\n  role        = aws_iam_role.eks_cluster.id\n\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"ec2:DescribeInstances\",\n      \"Resource\": \"*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_eks_node_group\" \"main\" {\n  cluster_name    = aws_eks_cluster.main.name\n  node_group_name = \"${var.eks_cluster_name}-node-group\"\n  node_role_arn   = aws_iam_role.node.arn\n\n  scaling_config {\n    desired_size = 2\n    max_size     = 2\n    min_size     = 1\n  }\n}\n\nresource \"aws_iam_role\" \"node\" {\n  name        = \"${var.eks_cluster_name}-node\"\n  description = \"EKS node role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy\" \"node\" {\n  name        = \"${var.eks_cluster_name}-node-policy\"\n  role        = aws_iam_role.node.id\n\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"ec2:DescribeInstances\",\n      \"Resource\": \"*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_db_subnet_group\" \"main\" {\n  name        = \"${var.env_name}-db-subnet-group\"\n  description = \"RDS subnet group\"\n\n  subnet_ids = [aws_subnet.private.id]\n}\n\nresource \"aws_rds_instance\" \"rds\" {\n  allocated_storage    = 20\n  engine               = \"mysql\"\n  instance_class       = var.rds_instance_type\n  username            = \"admin\"\n  password           = \"password1234\"\n\n  db_subnet_group_name = aws_db_subnet_group.main.name\n\n  vpc_security_group_ids = [aws_security_group.rds.id]\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_security_group\" \"rds\" {\n  name        = \"${var.env_name}-rds-sg\"\n  description = \"RDS security group\"\n\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 3306\n    to_port     = 3306\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_eks_pod\" \"wordpress\" {\n  cluster_name    = aws_eks_cluster.main.name\n  node_group_name = aws_eks_node_group.main.node_group_name\n\n  container {\n    image      = \"wordpress:latest\"\n    name       = \"wordpress\"\n    portMappings {\n      container_port = 80\n      host_port      = 80\n    }\n  }\n}\n\nresource \"aws_eks_service\" \"wordpress\" {\n  cluster_name    = aws_eks_cluster.main.name\n  namespace_name = \"default\"\n\n  service_type = \"LoadBalancer\"\n\n  selector = {\n    app = \"wordpress\"\n  }\n\n  port = {\n    name   = \"http\"\n    number = 80\n  }\n}\n```",
     "secured_code": "```terraform\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env_name\" {\n  type = string\n}\n\nvariable \"eks_cluster_name\" {\n  type = string\n}\n\nvariable \"rds_instance_type\" {\n  type = string\n}\n\noutput \"eks_cluster_endpoint\" {\n  value = aws_eks_cluster.main.endpoint\n}\n\noutput \"rds_instance_address\" {\n  value = aws_db_instance.rds.address\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_subnet\" \"private\" {\n  cidr_block = \"10.0.2.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_eks_cluster\" \"main\" {\n  name     = var.eks_cluster_name\n  role_arn = aws_iam_role.eks_cluster.arn\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_iam_role\" \"eks_cluster\" {\n  name        = \"${var.eks_cluster_name}-cluster\"\n  description = \"EKS cluster role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"eks.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy\" \"eks_cluster\" {\n  name        = \"${var.eks_cluster_name}-cluster-policy\"\n  role        = aws_iam_role.eks_cluster.id\n\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"ec2:DescribeInstances\",\n      \"Resource\": \"*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_eks_node_group\" \"main\" {\n  cluster_name    = aws_eks_cluster.main.name\n  node_group_name = \"${var.eks_cluster_name}-node-group\"\n  node_role_arn   = aws_iam_role.node.arn\n\n  scaling_config {\n    desired_size = 2\n    max_size     = 2\n    min_size     = 1\n  }\n}\n\nresource \"aws_iam_role\" \"node\" {\n  name        = \"${var.eks_cluster_name}-node\"\n  description = \"EKS node role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy\" \"node\" {\n  name        = \"${var.eks_cluster_name}-node-policy\"\n  role        = aws_iam_role.node.id\n\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"ec2:DescribeInstances\",\n      \"Resource\": \"*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_db_subnet_group\" \"main\" {\n  name        = \"${var.env_name}-db-subnet-group\"\n  description = \"RDS subnet group\"\n\n  subnet_ids = [aws_subnet.private.id]\n}\n\nresource \"aws_rds_instance\" \"rds\" {\n  allocated_storage    = 20\n  engine               = \"mysql\"\n  instance_class       = var.rds_instance_type\n  username            = \"admin\"\n  password           = \"password1234\"\n\n  db_subnet_group_name = aws_db_subnet_group.main.name\n\n  vpc_security_group_ids = [aws_security_group.rds.id]\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_security_group\" \"rds\" {\n  name        = \"${var.env_name}-rds-sg\"\n  description = \"RDS security group\"\n\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 3306\n    to_port     = 3306\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_eks_pod\" \"wordpress\" {\n  cluster_name    = aws_eks_cluster.main.name\n  node_group_name = aws_eks_node_group.main.node_group_name\n\n  container {\n    image      = \"wordpress:latest\"\n    name       = \"wordpress\"\n    portMappings {\n      container_port = 80\n      host_port      = 80\n    }\n  }\n}\n\nresource \"aws_eks_service\" \"wordpress\" {\n  cluster_name    = aws_eks_cluster.main.name\n  namespace_name = \"default\"\n\n  service_type = \"LoadBalancer\"\n\n  selector = {\n    app = \"wordpress\"\n  }\n\n  port = {\n    name   = \"http\"\n    number = 80\n  }\n}\n```",
     "timestamp": "2025-03-14T23:56:49.217641"
+  },
+  "e0a7fc0f-bc08-4b46-bd22-aafc1614b869": {
+    "id": "e0a7fc0f-bc08-4b46-bd22-aafc1614b869",
+    "type": "deployment",
+    "status": "deployment_completed",
+    "created_at": "2025-03-15T02:38:25.440383",
+    "updated_at": "2025-03-15T02:38:25.440387",
+    "result": {
+      "deployment_status": "completed",
+      "resource_endpoints": {},
+      "errors": []
+    }
+  },
+  "3ebaf683-463b-43d5-ba7e-378c1b4cb708": {
+    "id": "3ebaf683-463b-43d5-ba7e-378c1b4cb708",
+    "type": "deployment",
+    "status": "deployment_completed",
+    "created_at": "2025-03-15T02:41:43.417639",
+    "updated_at": "2025-03-15T02:41:43.417643",
+    "result": {
+      "deployment_status": "completed",
+      "resource_endpoints": {},
+      "errors": []
+    }
+  },
+  "c1b87d61-0e98-4bcf-b6cf-945504c812f7": {
+    "type": "infrastructure_generation",
+    "request": {
+      "task": "Create a simple web application with EC2 and S3",
+      "requirements": {},
+      "cloud_provider": "aws",
+      "iac_type": "terraform"
+    },
+    "result": {
+      "task_id": "c1b87d61-0e98-4bcf-b6cf-945504c812f7",
+      "code": "```\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"app_name\" {\n  type = string\n}\n\nvariable \"instance_type\" {\n  type = string\n}\n\noutput \"ec2_instance_id\" {\n  value = aws_instance.web.id\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.web_app.bucket\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_security_group\" \"web_sg\" {\n  name        = \"${var.app_name}-sg\"\n  description = \"Security group for web application\"\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = \"ami-abcd1234\"\n  instance_type = var.instance_type\n  vpc_security_group_ids = [aws_security_group.web_sg.id]\n  subnet_id = aws_subnet.public.id\n  key_name               = \"my_key\"\n}\n\nresource \"aws_s3_bucket\" \"web_app\" {\n  bucket = \"${var.app_name}-bucket\"\n  acl    = \"public-read\"\n\n  policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicRead\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": \"s3:GetObject\",\n      \"Resource\": \"arn:aws:s3:::${var.app_name}-bucket/*\"\n    }\n  ]\n}\nEOF\n}\n\noutput \"bucket_arn\" {\n  value = aws_s3_bucket.web_app.arn\n}\n```",
+      "metadata": {
+        "resource_count": 5,
+        "module_count": 0,
+        "estimated_provisioning_time_minutes": 10,
+        "cloud_provider": "aws",
+        "generated_timestamp": 1742008168.7784898,
+        "similar_patterns_used": 0,
+        "similar_generations_used": 0,
+        "used_rag": false,
+        "architecture_findings": {
+          "reliability": [
+            {
+              "finding": "No autoscaling group defined for EC2 instance",
+              "description": "In a cloud-based environment, it's essential to use autoscaling groups to ensure that instances are scaled based on changing workload demands.",
+              "recommendation": "Create an autoscaling group for the EC2 instance"
+            },
+            {
+              "finding": "No backup or snapshot policy defined for S3 bucket",
+              "description": "Data loss can occur if there is no backup or snapshot policy in place. It's crucial to ensure that data is regularly backed up.",
+              "recommendation": "Create a backup or snapshot policy for the S3 bucket"
+            }
+          ],
+          "security": [
+            {
+              "finding": "S3 bucket ACL set to 'public-read'",
+              "description": "Making an S3 bucket publicly readable can lead to unauthorized access and potential data breaches.",
+              "recommendation": "Change the S3 bucket ACL to a more restrictive policy or use IAM permissions"
+            },
+            {
+              "finding": "EC2 instance using a hardcoded key name",
+              "description": "Using a hardcoded key name for EC2 instances can compromise security if the key is compromised or shared.",
+              "recommendation": "Use IAM roles or instance profiles instead of hardcoded key names"
+            }
+          ],
+          "cost_optimization": [
+            {
+              "finding": "No reserved instance pricing applied",
+              "description": "Reserved instances can significantly reduce costs for EC2 instances that run continuously.",
+              "recommendation": "Explore reserved instance pricing options for EC2 instances"
+            },
+            {
+              "finding": "Unused S3 bucket resources not optimized",
+              "description": "Unoptimized resources in S3 buckets can lead to unnecessary costs. Regularly reviewing and optimizing usage is crucial.",
+              "recommendation": "Regularly review and optimize S3 bucket resource usage"
+            }
+          ],
+          "performance": [
+            {
+              "finding": "EC2 instance using an outdated AMI",
+              "description": "Using outdated or unsupported AMIs can lead to performance issues, security vulnerabilities, or even instance termination.",
+              "recommendation": "Regularly update and maintain EC2 instance AMIs"
+            },
+            {
+              "finding": "No load balancer or ELB configured",
+              "description": "Load balancers or Elastic Load Balancers (ELBs) can improve instance performance by distributing traffic and reducing latency.",
+              "recommendation": "Configure a load balancer or ELB for EC2 instances"
+            }
+          ],
+          "operational_excellence": [
+            {
+              "finding": "No monitoring or logging configured",
+              "description": "Monitoring and logging are crucial for identifying issues, troubleshooting, and ensuring instance health.",
+              "recommendation": "Configure monitoring and logging tools (e.g., CloudWatch, ELK) for EC2 instances"
+            },
+            {
+              "finding": "No automated deployment or provisioning",
+              "description": "Automated deployment and provisioning can streamline the process of launching new instances or updating existing ones.",
+              "recommendation": "Explore automated deployment and provisioning options (e.g., AWS CodeDeploy, Terraform)"
+            }
+          ]
+        },
+        "security_findings": {
+          "vulnerabilities": [
+            {
+              "severity": "high",
+              "title": "Unencrypted S3 Bucket",
+              "description": "The S3 bucket is publicly readable without encryption, making it vulnerable to unauthorized access.",
+              "remediation": "Enable server-side encryption (SSE) for the S3 bucket and ensure that all objects are encrypted."
+            },
+            {
+              "severity": "high",
+              "title": "Unencrypted Storage for aws",
+              "description": "Storage resources are not configured with encryption",
+              "remediation": "Enable server-side encryption for all storage resources"
+            },
+            {
+              "severity": "medium",
+              "title": "Insecure IAM Role",
+              "description": "The IAM role associated with the EC2 instance has permissions that could allow unauthorized access to sensitive resources.",
+              "remediation": "Review and update the IAM role's permissions to restrict access only to necessary resources."
+            },
+            {
+              "severity": "low",
+              "title": "Unsecured SSH Key",
+              "description": "The SSH key is not encrypted, making it vulnerable to unauthorized use if compromised.",
+              "remediation": "Encrypt the SSH key using a secure method like AWS Key Management Service (KMS) or OpenSSL."
+            }
+          ],
+          "summary": {
+            "remediated_issues_count": 0,
+            "summary": "Remediation failed to produce valid code"
+          },
+          "risk_score": 0,
+          "compliance_results": {
+            "CIS AWS Benchmark": [
+              {
+                "control": "1.2 Ensure that IAM roles and users have unique IDs",
+                "status": "non-compliant"
+              },
+              {
+                "control": "4.3 Use a secure hash function to store passwords",
+                "status": "non-compliant"
+              }
+            ],
+            "AWS Well-Architected Security Pillar": [
+              {
+                "pillar": "Identity and Access Management",
+                "control": " IAM roles should be used instead of users for EC2 instances",
+                "status": "non-compliant"
+              },
+              {
+                "pillar": "Data Protection",
+                "control": "S3 buckets should have server-side encryption enabled",
+                "status": "non-compliant"
+              }
+            ]
+          }
+        }
+      },
+      "thoughts": "What a great task! As infrastructure_agent, I'll break down this task step-by-step, considering the requirements, potential challenges, best practices, and optimal approach.\n\n**Task:** Create a simple web application with EC2 and S3.\n\n**Information needed:**\n\n1. Web application requirements:\n\t* What is the purpose of the web app (e.g., authentication, data storage)?\n\t* What are the minimum resources required (CPU, memory, disk space)?\n2. AWS account details:\n\t* AWS region\n\t* IAM user or role with necessary permissions\n3. Networking and security requirements:\n\t* Subnet configuration\n\t* Security group settings\n\n**Potential challenges or edge cases:**\n\n1. Ensuring proper resource tagging for cost estimation and organization\n2. Handling potential limitations in EC2 instance types and availability zones\n3. Configuring S3 bucket policies for access control and data encryption\n4. Considering the web app's scalability and high availability requirements\n\n**Best practices:**\n\n1. Use Terraform for infrastructure as code (IaaS) management, leveraging its robust feature set and wide adoption.\n2. Apply least privilege principles when configuring IAM roles and permissions.\n3. Utilize AWS best practices for subnet configuration and security group settings.\n4. Monitor and optimize resource utilization to minimize costs.\n\n**Optimal approach:**\n\n1. Use Terraform to create the necessary infrastructure:\n\t* EC2 instance with desired resources (CPU, memory, disk space)\n\t* S3 bucket with proper permissions and encryption\n\t* Subnet configuration and security group settings\n2. Configure IAM roles for access control and permission management\n3. Deploy the web application on the EC2 instance using Ansible or Jenkins (if needed)\n4. Monitor and optimize resource utilization to minimize costs\n\n**Capabilities at my disposal:**\n\n1. Terraform generation: Perfectly suited for this task, as it allows me to create infrastructure as code.\n2. Infrastructure analysis: Helpful in understanding the web application's requirements and potential challenges.\n3. Cost estimation: Useful in optimizing resource utilization and minimizing costs.\n4. Pattern management: Not directly applicable in this case, but could be useful in managing similar patterns or templates.\n\nWith these considerations and capabilities at my disposal, I'm ready to create a simple web application with EC2 and S3 using Terraform!",
+      "architecture_findings": {
+        "reliability": [
+          {
+            "finding": "No autoscaling group defined for EC2 instance",
+            "description": "In a cloud-based environment, it's essential to use autoscaling groups to ensure that instances are scaled based on changing workload demands.",
+            "recommendation": "Create an autoscaling group for the EC2 instance"
+          },
+          {
+            "finding": "No backup or snapshot policy defined for S3 bucket",
+            "description": "Data loss can occur if there is no backup or snapshot policy in place. It's crucial to ensure that data is regularly backed up.",
+            "recommendation": "Create a backup or snapshot policy for the S3 bucket"
+          }
+        ],
+        "security": [
+          {
+            "finding": "S3 bucket ACL set to 'public-read'",
+            "description": "Making an S3 bucket publicly readable can lead to unauthorized access and potential data breaches.",
+            "recommendation": "Change the S3 bucket ACL to a more restrictive policy or use IAM permissions"
+          },
+          {
+            "finding": "EC2 instance using a hardcoded key name",
+            "description": "Using a hardcoded key name for EC2 instances can compromise security if the key is compromised or shared.",
+            "recommendation": "Use IAM roles or instance profiles instead of hardcoded key names"
+          }
+        ],
+        "cost_optimization": [
+          {
+            "finding": "No reserved instance pricing applied",
+            "description": "Reserved instances can significantly reduce costs for EC2 instances that run continuously.",
+            "recommendation": "Explore reserved instance pricing options for EC2 instances"
+          },
+          {
+            "finding": "Unused S3 bucket resources not optimized",
+            "description": "Unoptimized resources in S3 buckets can lead to unnecessary costs. Regularly reviewing and optimizing usage is crucial.",
+            "recommendation": "Regularly review and optimize S3 bucket resource usage"
+          }
+        ],
+        "performance": [
+          {
+            "finding": "EC2 instance using an outdated AMI",
+            "description": "Using outdated or unsupported AMIs can lead to performance issues, security vulnerabilities, or even instance termination.",
+            "recommendation": "Regularly update and maintain EC2 instance AMIs"
+          },
+          {
+            "finding": "No load balancer or ELB configured",
+            "description": "Load balancers or Elastic Load Balancers (ELBs) can improve instance performance by distributing traffic and reducing latency.",
+            "recommendation": "Configure a load balancer or ELB for EC2 instances"
+          }
+        ],
+        "operational_excellence": [
+          {
+            "finding": "No monitoring or logging configured",
+            "description": "Monitoring and logging are crucial for identifying issues, troubleshooting, and ensuring instance health.",
+            "recommendation": "Configure monitoring and logging tools (e.g., CloudWatch, ELK) for EC2 instances"
+          },
+          {
+            "finding": "No automated deployment or provisioning",
+            "description": "Automated deployment and provisioning can streamline the process of launching new instances or updating existing ones.",
+            "recommendation": "Explore automated deployment and provisioning options (e.g., AWS CodeDeploy, Terraform)"
+          }
+        ]
+      },
+      "security_findings": {
+        "vulnerabilities": [
+          {
+            "severity": "high",
+            "title": "Unencrypted S3 Bucket",
+            "description": "The S3 bucket is publicly readable without encryption, making it vulnerable to unauthorized access.",
+            "remediation": "Enable server-side encryption (SSE) for the S3 bucket and ensure that all objects are encrypted."
+          },
+          {
+            "severity": "high",
+            "title": "Unencrypted Storage for aws",
+            "description": "Storage resources are not configured with encryption",
+            "remediation": "Enable server-side encryption for all storage resources"
+          },
+          {
+            "severity": "medium",
+            "title": "Insecure IAM Role",
+            "description": "The IAM role associated with the EC2 instance has permissions that could allow unauthorized access to sensitive resources.",
+            "remediation": "Review and update the IAM role's permissions to restrict access only to necessary resources."
+          },
+          {
+            "severity": "low",
+            "title": "Unsecured SSH Key",
+            "description": "The SSH key is not encrypted, making it vulnerable to unauthorized use if compromised.",
+            "remediation": "Encrypt the SSH key using a secure method like AWS Key Management Service (KMS) or OpenSSL."
+          }
+        ],
+        "summary": {
+          "remediated_issues_count": 0,
+          "summary": "Remediation failed to produce valid code"
+        },
+        "risk_score": 0,
+        "compliance_results": {
+          "CIS AWS Benchmark": [
+            {
+              "control": "1.2 Ensure that IAM roles and users have unique IDs",
+              "status": "non-compliant"
+            },
+            {
+              "control": "4.3 Use a secure hash function to store passwords",
+              "status": "non-compliant"
+            }
+          ],
+          "AWS Well-Architected Security Pillar": [
+            {
+              "pillar": "Identity and Access Management",
+              "control": " IAM roles should be used instead of users for EC2 instances",
+              "status": "non-compliant"
+            },
+            {
+              "pillar": "Data Protection",
+              "control": "S3 buckets should have server-side encryption enabled",
+              "status": "non-compliant"
+            }
+          ]
+        }
+      },
+      "iac_type": "terraform",
+      "cloud_provider": "aws"
+    },
+    "original_code": "```\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"app_name\" {\n  type = string\n}\n\nvariable \"instance_type\" {\n  type = string\n}\n\noutput \"ec2_instance_id\" {\n  value = aws_instance.web.id\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.web_app.bucket\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_security_group\" \"web_sg\" {\n  name        = \"${var.app_name}-sg\"\n  description = \"Security group for web application\"\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = \"ami-abcd1234\"\n  instance_type = var.instance_type\n  vpc_security_group_ids = [aws_security_group.web_sg.id]\n  subnet_id = aws_subnet.public.id\n  key_name               = \"my_key\"\n}\n\nresource \"aws_s3_bucket\" \"web_app\" {\n  bucket = \"${var.app_name}-bucket\"\n  acl    = \"public-read\"\n\n  policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicRead\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": \"s3:GetObject\",\n      \"Resource\": \"arn:aws:s3:::${var.app_name}-bucket/*\"\n    }\n  ]\n}\nEOF\n}\n\noutput \"bucket_arn\" {\n  value = aws_s3_bucket.web_app.arn\n}\n```",
+    "improved_code": "```\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"app_name\" {\n  type = string\n}\n\nvariable \"instance_type\" {\n  type = string\n}\n\noutput \"ec2_instance_id\" {\n  value = aws_instance.web.id\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.web_app.bucket\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_security_group\" \"web_sg\" {\n  name        = \"${var.app_name}-sg\"\n  description = \"Security group for web application\"\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = \"ami-abcd1234\"\n  instance_type = var.instance_type\n  vpc_security_group_ids = [aws_security_group.web_sg.id]\n  subnet_id = aws_subnet.public.id\n  key_name               = \"my_key\"\n}\n\nresource \"aws_s3_bucket\" \"web_app\" {\n  bucket = \"${var.app_name}-bucket\"\n  acl    = \"public-read\"\n\n  policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicRead\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": \"s3:GetObject\",\n      \"Resource\": \"arn:aws:s3:::${var.app_name}-bucket/*\"\n    }\n  ]\n}\nEOF\n}\n\noutput \"bucket_arn\" {\n  value = aws_s3_bucket.web_app.arn\n}\n```",
+    "secured_code": "```\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"app_name\" {\n  type = string\n}\n\nvariable \"instance_type\" {\n  type = string\n}\n\noutput \"ec2_instance_id\" {\n  value = aws_instance.web.id\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.web_app.bucket\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_security_group\" \"web_sg\" {\n  name        = \"${var.app_name}-sg\"\n  description = \"Security group for web application\"\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = \"ami-abcd1234\"\n  instance_type = var.instance_type\n  vpc_security_group_ids = [aws_security_group.web_sg.id]\n  subnet_id = aws_subnet.public.id\n  key_name               = \"my_key\"\n}\n\nresource \"aws_s3_bucket\" \"web_app\" {\n  bucket = \"${var.app_name}-bucket\"\n  acl    = \"public-read\"\n\n  policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicRead\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": \"s3:GetObject\",\n      \"Resource\": \"arn:aws:s3:::${var.app_name}-bucket/*\"\n    }\n  ]\n}\nEOF\n}\n\noutput \"bucket_arn\" {\n  value = aws_s3_bucket.web_app.arn\n}\n```",
+    "timestamp": "2025-03-15T03:10:08.109564"
+  },
+  "627f30a1-f666-4c52-9597-3482a9c3e5dc": {
+    "type": "infrastructure_generation",
+    "request": {
+      "task": "deploy a simple web application with Ec2 and S3",
+      "requirements": {},
+      "cloud_provider": "aws",
+      "iac_type": "terraform"
+    },
+    "result": {
+      "task_id": "627f30a1-f666-4c52-9597-3482a9c3e5dc",
+      "code": "`\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"app_name\" {\n  type = string\n}\n\nvariable \"instance_type\" {\n  type = string\n}\n\noutput \"ec2_instance_id\" {\n  value = aws_instance.web.id\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.web_app.bucket\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n  lifecycle {\n    create_before_destroy = true\n  }\n}\n\nresource \"aws_subnet\" \"private\" {\n  cidr_block = \"10.0.2.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2b\"\n\n  lifecycle {\n    create_before_destroy = true\n  }\n}\n\nresource \"aws_security_group\" \"web_sg\" {\n  name        = \"${var.app_name}-sg\"\n  description = \"Security group for web application\"\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"10.0.0.0/16\"] // Allow traffic only from within the VPC\n  }\n\n  egress {\n    from_port   = 0\n    to_port     = 0\n    protocol    = \"-1\"\n    cidr_blocks = [\"0.0.0.0/0\"] // Restrict outgoing traffic to necessary destinations\n  }\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = \"ami-abcd1234\"\n  instance_type = var.instance_type\n  vpc_security_group_ids = [aws_security_group.web_sg.id]\n  subnet_id = aws_subnet.public.id\n  key_name               = \"my_key\"\n\n  // Enable server-side encryption for the EBS volume\n  ebs_block_device {\n    encrypted = true\n  }\n\n  lifecycle {\n    create_before_destroy = true\n  }\n}\n\nresource \"aws_s3_bucket\" \"web_app\" {\n  bucket = \"${var.app_name}-s3-bucket\"\n  acl    = \"private\"\n\n  // Enable server-side encryption for the S3 bucket\n  server_side_encryption_configuration {\n    rule {\n      apply_server_side_encryption_by_default {\n        sse_algorithm = \"AES256\"\n      }\n    }\n  }\n\n  versioning {\n    enabled = true\n  }\n}\n\nresource \"aws_s3_bucket_versioning\" \"web_app_versioning\" {\n  bucket = aws_s3_bucket.web_app.id\n\n  // Ensure versioning is enabled for the S3 bucket\n  versioning_configuration {\n    MFUEnabled = true\n    Status     = \"Enabled\"\n  }\n}\n\nresource \"aws_iam_policy\" \"ec2_instance_policy\" {\n  name        = \"${var.app_name}-ec2-instance-policy\"\n  description = \"Policy for EC2 instances\"\n\n  // Limit access to only necessary resources and actions\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": [\"s3:GetObject\", \"s3:ListBucket\"],\n      \"Resource\": \"${aws_s3_bucket.web_app.arn}/*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_policy_attachment\" \"ec2_instance_policy_attach\" {\n  name       = \"${var.app_name}-ec2-instance-policy-attach\"\n  role       = aws_iam_role.ec2_instance_role.name\n  policy_arn = aws_iam_policy.ec2_instance_policy.arn\n}\n\nresource \"aws_s3_bucket_versioning\" \"web_app_versioning\" {\n  bucket = aws_s3_bucket.web_app.id\n\n  // Ensure versioning is enabled for the S3 bucket\n  versioning_configuration {\n    MFUEnabled = true\n    Status     = \"Enabled\"\n  }\n}",
+      "metadata": {
+        "resource_count": 8,
+        "module_count": 0,
+        "estimated_provisioning_time_minutes": 16,
+        "cloud_provider": "aws",
+        "generated_timestamp": 1742008285.2664618,
+        "similar_patterns_used": 0,
+        "similar_generations_used": 1,
+        "used_rag": true,
+        "architecture_findings": {
+          "reliability": [
+            {
+              "finding": "The use of a single Availability Zone (us-west-2a) for the subnet may lead to Single Point of Failure (SPOF). Consider using multiple AZs for redundancy."
+            },
+            {
+              "finding": "There is no Auto Scaling Group (ASG) defined for the EC2 instance. This could lead to reliability issues in case of unexpected increases or decreases in workload."
+            }
+          ],
+          "security": [
+            {
+              "finding": "The S3 bucket ACL is set to 'public-read', which may not be desirable for a production environment. Consider setting it to 'private' instead."
+            },
+            {
+              "finding": "There are no Network Access Control Lists (NACLs) defined for the subnet, which could lead to security issues if not properly configured."
+            }
+          ],
+          "cost_optimization": [
+            {
+              "recommendation": "Consider using spot instances for non-production workloads or when workload is predictable and can tolerate interruptions."
+            },
+            {
+              "finding": "The use of a single EBS volume with a fixed size may lead to underutilization. Consider using Elastic File System (EFS) or Amazon S3 instead, which provide more flexible storage options."
+            }
+          ],
+          "performance": [
+            {
+              "finding": "There is no load balancer defined for the EC2 instance. This could lead to performance issues if the instance becomes unresponsive or experiences high CPU utilization."
+            },
+            {
+              "recommendation": "Consider using Amazon RDS instead of EBS volume for relational databases, as it provides better performance and scalability."
+            }
+          ],
+          "operational_excellence": [
+            {
+              "finding": "There is no monitoring or logging configured for the EC2 instance. This could lead to operational issues if unexpected events occur."
+            },
+            {
+              "recommendation": "Consider using Amazon CloudWatch, Amazon CloudTrail, and AWS X-Ray to monitor and analyze application performance and behavior."
+            }
+          ],
+          "critical_issues": [
+            {
+              "finding": "The EC2 instance is not configured with a backup strategy. This could lead to data loss in case of unexpected events or instance failures."
+            },
+            {
+              "finding": "There are no IAM roles or permissions defined for the EC2 instance. This could lead to security issues if the instance is compromised."
+            }
+          ],
+          "recommendations": [
+            {
+              "recommendation": "Consider using Amazon S3 bucket versioning and backups to ensure data integrity."
+            },
+            {
+              "recommendation": "Ensure that IAM roles and permissions are properly configured for the EC2 instance and other resources in the AWS environment."
+            }
+          ]
+        },
+        "security_findings": {
+          "vulnerabilities": [
+            {
+              "severity": "high",
+              "title": "Unencrypted Storage for aws",
+              "description": "Storage resources are not configured with encryption",
+              "remediation": "Enable server-side encryption for all storage resources"
+            },
+            {
+              "severity": "medium",
+              "title": "Insecure IAM Policy",
+              "description": "The policy 'AmazonEC2ReadOnlyAccess' is too permissive, allowing read-only access to EC2 instances. Consider limiting permissions or using a more restrictive policy.",
+              "remediation": "Review and update the IAM policy to limit access to only necessary resources"
+            },
+            {
+              "severity": "low",
+              "title": "Missing Security Group Rules",
+              "description": "The security group 'web_sg' allows inbound traffic from 0.0.0.0/0 on port 80, which may not be necessary or secure.",
+              "remediation": "Review and update the security group rules to only allow necessary traffic"
+            }
+          ],
+          "summary": {
+            "remediated_issues_count": 3,
+            "critical_issues_fixed": 1,
+            "issues_by_severity": {
+              "high": 1,
+              "medium": 1,
+              "low": 1
+            },
+            "summary": "Fixed 3 security issues (1 critical)"
+          },
+          "risk_score": 0,
+          "compliance_results": {
+            "CIS AWS Benchmark": [
+              {
+                "control": "1.3: Ensure that IAM roles are used for users and services",
+                "status": "non-compliant"
+              },
+              {
+                "control": "3.5: Configure VPC flow logs to log all traffic",
+                "status": "non-compliant"
+              }
+            ],
+            "AWS Well-Architected Security Pillar": [
+              {
+                "control": "1.2: Ensure that IAM roles are used for users and services",
+                "status": "non-compliant"
+              },
+              {
+                "control": "3.4: Configure VPC flow logs to log all traffic",
+                "status": "non-compliant"
+              }
+            ]
+          }
+        }
+      },
+      "thoughts": "As infrastructure_agent, I'll break down this task step-by-step, considering the requirements, potential challenges, best practices, and optimal approach.\n\n**1. Information needed:**\n\nTo complete this task, I need the following information:\n\n* Web application requirements:\n\t+ What is the desired web application technology stack (e.g., Python, Node.js, Ruby)?\n\t+ What are the expected traffic patterns and usage rates?\n\t+ Are there any specific security or compliance requirements?\n\n**2. Potential challenges or edge cases:**\n\nSome potential challenges or edge cases to consider:\n\n* Ensuring proper security groups and network configurations for EC2 instances\n* Handling data storage and persistence using S3\n* Configuring load balancing and autoscaling for high availability\n* Integrating with other AWS services (e.g., RDS, Elastic Beanstalk)\n\n**3. Best practices:**\n\nTo ensure a robust and efficient infrastructure-as-code solution, I'll follow these best practices:\n\n* Use Terraform to manage and provision the infrastructure\n* Leverage Ansible for automated configuration management and deployment\n* Utilize Jenkins for continuous integration and delivery (CI/CD) pipelines\n* Implement cost estimation and monitoring using our built-in capabilities\n\n**4. Optimal approach:**\n\nHere's a high-level outline of the optimal approach:\n\n1. Gather requirements and define the infrastructure architecture\n2. Design and implement the EC2 instances with the desired technology stack\n3. Configure S3 for data storage and persistence\n4. Set up load balancing and autoscaling for high availability\n5. Integrate with other AWS services as needed (e.g., RDS, Elastic Beanstalk)\n6. Use Terraform to provision and manage the infrastructure\n7. Leverage Ansible for automated configuration management and deployment\n8. Create a Jenkins CI/CD pipeline to automate testing, building, and deployment\n\nWith these steps in mind, I'll begin generating the necessary infrastructure-as-code resources using our capabilities in terraform_generation, ansible_generation, jenkins_generation, infrastructure_analysis, cost_estimation, and pattern_management.\n\nNext step: Gathering requirements and defining the infrastructure architecture.",
+      "architecture_findings": {
+        "reliability": [
+          {
+            "finding": "The use of a single Availability Zone (us-west-2a) for the subnet may lead to Single Point of Failure (SPOF). Consider using multiple AZs for redundancy."
+          },
+          {
+            "finding": "There is no Auto Scaling Group (ASG) defined for the EC2 instance. This could lead to reliability issues in case of unexpected increases or decreases in workload."
+          }
+        ],
+        "security": [
+          {
+            "finding": "The S3 bucket ACL is set to 'public-read', which may not be desirable for a production environment. Consider setting it to 'private' instead."
+          },
+          {
+            "finding": "There are no Network Access Control Lists (NACLs) defined for the subnet, which could lead to security issues if not properly configured."
+          }
+        ],
+        "cost_optimization": [
+          {
+            "recommendation": "Consider using spot instances for non-production workloads or when workload is predictable and can tolerate interruptions."
+          },
+          {
+            "finding": "The use of a single EBS volume with a fixed size may lead to underutilization. Consider using Elastic File System (EFS) or Amazon S3 instead, which provide more flexible storage options."
+          }
+        ],
+        "performance": [
+          {
+            "finding": "There is no load balancer defined for the EC2 instance. This could lead to performance issues if the instance becomes unresponsive or experiences high CPU utilization."
+          },
+          {
+            "recommendation": "Consider using Amazon RDS instead of EBS volume for relational databases, as it provides better performance and scalability."
+          }
+        ],
+        "operational_excellence": [
+          {
+            "finding": "There is no monitoring or logging configured for the EC2 instance. This could lead to operational issues if unexpected events occur."
+          },
+          {
+            "recommendation": "Consider using Amazon CloudWatch, Amazon CloudTrail, and AWS X-Ray to monitor and analyze application performance and behavior."
+          }
+        ],
+        "critical_issues": [
+          {
+            "finding": "The EC2 instance is not configured with a backup strategy. This could lead to data loss in case of unexpected events or instance failures."
+          },
+          {
+            "finding": "There are no IAM roles or permissions defined for the EC2 instance. This could lead to security issues if the instance is compromised."
+          }
+        ],
+        "recommendations": [
+          {
+            "recommendation": "Consider using Amazon S3 bucket versioning and backups to ensure data integrity."
+          },
+          {
+            "recommendation": "Ensure that IAM roles and permissions are properly configured for the EC2 instance and other resources in the AWS environment."
+          }
+        ]
+      },
+      "security_findings": {
+        "vulnerabilities": [
+          {
+            "severity": "high",
+            "title": "Unencrypted Storage for aws",
+            "description": "Storage resources are not configured with encryption",
+            "remediation": "Enable server-side encryption for all storage resources"
+          },
+          {
+            "severity": "medium",
+            "title": "Insecure IAM Policy",
+            "description": "The policy 'AmazonEC2ReadOnlyAccess' is too permissive, allowing read-only access to EC2 instances. Consider limiting permissions or using a more restrictive policy.",
+            "remediation": "Review and update the IAM policy to limit access to only necessary resources"
+          },
+          {
+            "severity": "low",
+            "title": "Missing Security Group Rules",
+            "description": "The security group 'web_sg' allows inbound traffic from 0.0.0.0/0 on port 80, which may not be necessary or secure.",
+            "remediation": "Review and update the security group rules to only allow necessary traffic"
+          }
+        ],
+        "summary": {
+          "remediated_issues_count": 3,
+          "critical_issues_fixed": 1,
+          "issues_by_severity": {
+            "high": 1,
+            "medium": 1,
+            "low": 1
+          },
+          "summary": "Fixed 3 security issues (1 critical)"
+        },
+        "risk_score": 0,
+        "compliance_results": {
+          "CIS AWS Benchmark": [
+            {
+              "control": "1.3: Ensure that IAM roles are used for users and services",
+              "status": "non-compliant"
+            },
+            {
+              "control": "3.5: Configure VPC flow logs to log all traffic",
+              "status": "non-compliant"
+            }
+          ],
+          "AWS Well-Architected Security Pillar": [
+            {
+              "control": "1.2: Ensure that IAM roles are used for users and services",
+              "status": "non-compliant"
+            },
+            {
+              "control": "3.4: Configure VPC flow logs to log all traffic",
+              "status": "non-compliant"
+            }
+          ]
+        }
+      },
+      "iac_type": "terraform",
+      "cloud_provider": "aws"
+    },
+    "original_code": "```\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"app_name\" {\n  type = string\n}\n\nvariable \"instance_type\" {\n  type = string\n}\n\noutput \"ec2_instance_id\" {\n  value = aws_instance.web.id\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.web_app.bucket\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_security_group\" \"web_sg\" {\n  name        = \"${var.app_name}-sg\"\n  description = \"Security group for web application\"\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n\n  egress {\n    from_port   = 0\n    to_port     = 0\n    protocol    = \"-1\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = \"ami-abcd1234\"\n  instance_type = var.instance_type\n  vpc_security_group_ids = [aws_security_group.web_sg.id]\n  subnet_id = aws_subnet.public.id\n  key_name               = \"my_key\"\n}\n\nresource \"aws_s3_bucket\" \"web_app\" {\n  bucket = \"${var.app_name}-s3-bucket\"\n  acl    = \"public-read\"\n\n  policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicRead\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": [\"s3:GetObject\"],\n      \"Resource\": [\"arn:aws:s3:::${var.app_name}-s3-bucket/*\"]\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_s3_bucket_object\" \"web_app_index\" {\n  bucket = aws_s3_bucket.web_app.id\n  key    = \"index.html\"\n  content = <<EOF\n<html>\n  <body>\n    <h1>Welcome to ${var.app_name}!</h1>\n  </body>\n</html>\nEOF\n}\n\nresource \"aws_ebs_volume\" \"web_vol\" {\n  availability_zone = aws_subnet.public.availability_zone\n  size              = 20\n  type               = \"gp2\"\n  encrypted         = true\n\n  tags = {\n    Name = \"${var.app_name}-volume\"\n  }\n}\n\nresource \"aws_ec2_attachment\" \"web_attach\" {\n  instance_id = aws_instance.web.id\n  volume_id   = aws_ebs_volume.web_vol.id\n}\n```",
+    "improved_code": "provider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"app_name\" {\n  type = string\n}\n\nvariable \"instance_type\" {\n  type = string\n}\n\noutput \"ec2_instance_id\" {\n  value = aws_instance.web.id\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.web_app.bucket\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n  lifecycle {\n    create_before_destroy = true\n  }\n}\n\nresource \"aws_subnet\" \"private\" {\n  cidr_block = \"10.0.2.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2b\"\n\n  lifecycle {\n    create_before_destroy = true\n  }\n}\n\nresource \"aws_security_group\" \"web_sg\" {\n  name        = \"${var.app_name}-sg\"\n  description = \"Security group for web application\"\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n\n  egress {\n    from_port   = 0\n    to_port     = 0\n    protocol    = \"-1\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = \"ami-abcd1234\"\n  instance_type = var.instance_type\n  vpc_security_group_ids = [aws_security_group.web_sg.id]\n  subnet_id = aws_subnet.public.id\n  key_name               = \"my_key\"\n\n  lifecycle {\n    create_before_destroy = true\n  }\n}\n\nresource \"aws_s3_bucket\" \"web_app\" {\n  bucket = \"${var.app_name}-s3-bucket\"\n  acl    = \"private\"\n\n  policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicRead\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": [\"s3:GetObject\"],\n      \"Resource\": [\"arn:aws:s3:::${var.app_name}-s3-bucket/*\"]\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_s3_bucket_object\" \"web_app_index\" {\n  bucket = aws_s3_bucket.web_app.id\n  key    = \"index.html\"\n  content = <<EOF\n<html>\n  <body>\n    <h1>Welcome to ${var.app_name}!</h1>\n  </body>\n</html>\nEOF\n}\n\nresource \"aws_autoscaling_group\" \"web_asg\" {\n  name                 = \"${var.app_name}-asg\"\n  max_size             = 2\n  min_size             = 1\n  desired_capacity     = 1\n  vpc_zone_identifier  = [aws_subnet.public.id, aws_subnet.private.id]\n  launch_configuration = aws_launch_configuration.web.name\n\n  lifecycle {\n    create_before_destroy = true\n  }\n}\n\nresource \"aws_launch_configuration\" \"web\" {\n  name            = \"${var.app_name}-lc\"\n  image_id        = \"ami-abcd1234\"\n  instance_type   = var.instance_type\n  security_groups = [aws_security_group.web_sg.id]\n\n  lifecycle {\n    create_before_destroy = true\n  }\n}\n\nresource \"aws_ebs_volume\" \"web_vol\" {\n  availability_zone = aws_subnet.public.availability_zone\n  size              = 20\n  type               = \"gp2\"\n  encrypted         = true\n\n  lifecycle {\n    create_before_destroy = true\n  }\n}\n\nresource \"aws_volume_attachment\" \"web_vol_attach\" {\n  device_name = \"/dev/sda1\"\n  volume_id   = aws_ebs_volume.web_vol.id\n  instance_id = aws_instance.web.id\n\n  lifecycle {\n    create_before_destroy = true\n  }\n}\n\nresource \"aws_iam_role\" \"ec2_instance_role\" {\n  name        = \"${var.app_name}-instance-role\"\n  description = \"IAM role for EC2 instances\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\",\n      \"Sid\": \"\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_policy_attachment\" \"ec2_instance_role_attach\" {\n  name       = \"${var.app_name}-instance-policy-attach\"\n  role       = aws_iam_role.ec2_instance_role.name\n  policy_arn = \"arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess\"\n}\n\nresource \"aws_s3_bucket_versioning\" \"web_app_versioning\" {\n  bucket = aws_s3_bucket.web_app.id\n\n  versioning_configuration = <<EOF\n{\n  \"MFUEnabled\": true,\n  \"Status\": \"Enabled\"\n}\nEOF\n}",
+    "secured_code": "`\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"app_name\" {\n  type = string\n}\n\nvariable \"instance_type\" {\n  type = string\n}\n\noutput \"ec2_instance_id\" {\n  value = aws_instance.web.id\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.web_app.bucket\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n  lifecycle {\n    create_before_destroy = true\n  }\n}\n\nresource \"aws_subnet\" \"private\" {\n  cidr_block = \"10.0.2.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2b\"\n\n  lifecycle {\n    create_before_destroy = true\n  }\n}\n\nresource \"aws_security_group\" \"web_sg\" {\n  name        = \"${var.app_name}-sg\"\n  description = \"Security group for web application\"\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"10.0.0.0/16\"] // Allow traffic only from within the VPC\n  }\n\n  egress {\n    from_port   = 0\n    to_port     = 0\n    protocol    = \"-1\"\n    cidr_blocks = [\"0.0.0.0/0\"] // Restrict outgoing traffic to necessary destinations\n  }\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = \"ami-abcd1234\"\n  instance_type = var.instance_type\n  vpc_security_group_ids = [aws_security_group.web_sg.id]\n  subnet_id = aws_subnet.public.id\n  key_name               = \"my_key\"\n\n  // Enable server-side encryption for the EBS volume\n  ebs_block_device {\n    encrypted = true\n  }\n\n  lifecycle {\n    create_before_destroy = true\n  }\n}\n\nresource \"aws_s3_bucket\" \"web_app\" {\n  bucket = \"${var.app_name}-s3-bucket\"\n  acl    = \"private\"\n\n  // Enable server-side encryption for the S3 bucket\n  server_side_encryption_configuration {\n    rule {\n      apply_server_side_encryption_by_default {\n        sse_algorithm = \"AES256\"\n      }\n    }\n  }\n\n  versioning {\n    enabled = true\n  }\n}\n\nresource \"aws_s3_bucket_versioning\" \"web_app_versioning\" {\n  bucket = aws_s3_bucket.web_app.id\n\n  // Ensure versioning is enabled for the S3 bucket\n  versioning_configuration {\n    MFUEnabled = true\n    Status     = \"Enabled\"\n  }\n}\n\nresource \"aws_iam_policy\" \"ec2_instance_policy\" {\n  name        = \"${var.app_name}-ec2-instance-policy\"\n  description = \"Policy for EC2 instances\"\n\n  // Limit access to only necessary resources and actions\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": [\"s3:GetObject\", \"s3:ListBucket\"],\n      \"Resource\": \"${aws_s3_bucket.web_app.arn}/*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_policy_attachment\" \"ec2_instance_policy_attach\" {\n  name       = \"${var.app_name}-ec2-instance-policy-attach\"\n  role       = aws_iam_role.ec2_instance_role.name\n  policy_arn = aws_iam_policy.ec2_instance_policy.arn\n}\n\nresource \"aws_s3_bucket_versioning\" \"web_app_versioning\" {\n  bucket = aws_s3_bucket.web_app.id\n\n  // Ensure versioning is enabled for the S3 bucket\n  versioning_configuration {\n    MFUEnabled = true\n    Status     = \"Enabled\"\n  }\n}",
+    "timestamp": "2025-03-15T03:12:10.839692"
+  },
+  "246e559a-7450-4437-822b-6aa5176c3b4e": {
+    "id": "246e559a-7450-4437-822b-6aa5176c3b4e",
+    "type": "deployment",
+    "status": "deployment_completed",
+    "created_at": "2025-03-15T05:48:05.801764",
+    "updated_at": "2025-03-15T05:48:05.801768",
+    "result": {
+      "deployment_status": "completed",
+      "resource_endpoints": {},
+      "errors": []
+    }
   }
 }

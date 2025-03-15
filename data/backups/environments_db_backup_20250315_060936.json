@@ -1,0 +1,348 @@
+{
+  "4698801e-134f-4a17-a8c9-0463e6782298": {
+    "environment_id": "4698801e-134f-4a17-a8c9-0463e6782298",
+    "environment_name": "host-test",
+    "environment_type": "development",
+    "user_id": "user123",
+    "tools": [
+      "jira",
+      "gitlab"
+    ],
+    "custom_domain": null,
+    "resource_limits": {
+      "cpu": 2,
+      "memory": "4Gi"
+    },
+    "description": "Test environment with host deployment",
+    "created_at": "2025-03-15T04:34:00.672012",
+    "status": "failed",
+    "tool_endpoints": {},
+    "credentials": {},
+    "error": "[Errno 2] No such file or directory"
+  },
+  "50f403ae-4782-489e-921d-e43f57780c24": {
+    "environment_id": "50f403ae-4782-489e-921d-e43f57780c24",
+    "environment_name": "host-test",
+    "environment_type": "development",
+    "user_id": "user123",
+    "tools": [
+      "jira",
+      "gitlab"
+    ],
+    "custom_domain": null,
+    "resource_limits": {
+      "cpu": 2,
+      "memory": "4Gi"
+    },
+    "description": "Test environment with host deployment",
+    "created_at": "2025-03-15T04:38:12.685864",
+    "status": "failed",
+    "tool_endpoints": {},
+    "credentials": {},
+    "error": "[Errno 2] No such file or directory"
+  },
+  "9b6ed8fd-a9e4-4281-90e4-5eedf2d61b9d": {
+    "environment_id": "9b6ed8fd-a9e4-4281-90e4-5eedf2d61b9d",
+    "environment_name": "host-test-3",
+    "environment_type": "development",
+    "user_id": "user123",
+    "tools": [
+      "jira",
+      "gitlab"
+    ],
+    "custom_domain": null,
+    "resource_limits": {
+      "cpu": 2,
+      "memory": "4Gi"
+    },
+    "description": "Test environment with host deployment",
+    "created_at": "2025-03-15T04:41:02.644846",
+    "status": "failed",
+    "tool_endpoints": {},
+    "credentials": {},
+    "error": "[Errno 2] No such file or directory"
+  },
+  "e072c4e8-04dc-4bd4-be99-2de538b5f87c": {
+    "environment_id": "e072c4e8-04dc-4bd4-be99-2de538b5f87c",
+    "environment_name": "host-test-4",
+    "environment_type": "development",
+    "user_id": "user123",
+    "tools": [
+      "jira",
+      "gitlab"
+    ],
+    "custom_domain": null,
+    "resource_limits": {
+      "cpu": 2,
+      "memory": "4Gi"
+    },
+    "description": "Test environment with host deployment",
+    "created_at": "2025-03-15T04:42:43.594526",
+    "status": "running",
+    "tool_endpoints": {
+      "jira": "http://localhost:8080",
+      "gitlab": "http://localhost:8929",
+      "dashboard": "http://localhost:8080/dashboard"
+    },
+    "credentials": {},
+    "message": "Environment is now running",
+    "access_url": "http://localhost:8080/dashboard"
+  },
+  "58ea111e-e9bb-406f-aacc-7635bd73b626": {
+    "environment_id": "58ea111e-e9bb-406f-aacc-7635bd73b626",
+    "environment_name": "host-test-5",
+    "environment_type": "development",
+    "user_id": "user123",
+    "tools": [
+      "jira",
+      "gitlab"
+    ],
+    "custom_domain": null,
+    "resource_limits": {
+      "cpu": 2,
+      "memory": "4Gi"
+    },
+    "description": "Second test environment with host deployment",
+    "created_at": "2025-03-15T04:54:02.295730",
+    "status": "running",
+    "tool_endpoints": {
+      "jira": "http://localhost:8171",
+      "gitlab": "http://localhost:9020",
+      "dashboard": "http://localhost:8080/dashboard"
+    },
+    "credentials": {},
+    "message": "Environment is now running",
+    "access_url": "http://localhost:8080/dashboard"
+  },
+  "ad35f995-9835-4b46-950f-6128615d4767": {
+    "environment_id": "ad35f995-9835-4b46-950f-6128615d4767",
+    "environment_name": "auto-env",
+    "environment_type": "development",
+    "user_id": "user123",
+    "tools": [
+      "jira",
+      "gitlab"
+    ],
+    "custom_domain": null,
+    "resource_limits": {
+      "cpu": 2,
+      "memory": "4Gi"
+    },
+    "description": "Automated environment with host deployment",
+    "created_at": "2025-03-15T04:56:29.710199",
+    "status": "failed",
+    "tool_endpoints": {},
+    "credentials": {},
+    "error": "[Errno 2] No such file or directory: '/home/satish/infra-automation/setup_environment.sh'"
+  },
+  "0e8835a2-193e-4b85-8e95-b7e8752cec7c": {
+    "environment_id": "0e8835a2-193e-4b85-8e95-b7e8752cec7c",
+    "environment_name": "auto-env-2",
+    "environment_type": "development",
+    "user_id": "user123",
+    "tools": [
+      "jira",
+      "gitlab"
+    ],
+    "custom_domain": null,
+    "resource_limits": {
+      "cpu": 2,
+      "memory": "4Gi"
+    },
+    "description": "Automated environment with host deployment",
+    "created_at": "2025-03-15T04:57:54.172057",
+    "status": "running",
+    "tool_endpoints": {
+      "jira": "http://localhost:8114",
+      "gitlab": "http://localhost:8961",
+      "dashboard": "http://localhost:8115"
+    },
+    "credentials": {
+      "jira": {
+        "username": "admin",
+        "password": "admin"
+      },
+      "gitlab": {
+        "username": "root",
+        "password": "password"
+      }
+    },
+    "access_url": "http://localhost:8113",
+    "message": "Environment is now running"
+  },
+  "e0aedc7e-8c09-4fd0-a4b4-c9956521fdc3": {
+    "environment_id": "e0aedc7e-8c09-4fd0-a4b4-c9956521fdc3",
+    "environment_name": "auto-env-3",
+    "environment_type": "development",
+    "user_id": "user123",
+    "tools": [
+      "jira",
+      "gitlab"
+    ],
+    "custom_domain": null,
+    "resource_limits": {
+      "cpu": 2,
+      "memory": "4Gi"
+    },
+    "description": "Automated environment with host deployment",
+    "created_at": "2025-03-15T05:13:12.811018",
+    "status": "running",
+    "tool_endpoints": {
+      "jira": "http://localhost:8178",
+      "gitlab": "http://localhost:9027",
+      "dashboard": "http://localhost:8179"
+    },
+    "credentials": {
+      "jira": {
+        "username": "admin",
+        "password": "admin"
+      },
+      "gitlab": {
+        "username": "root",
+        "password": "password"
+      }
+    },
+    "access_url": "http://localhost:8179",
+    "message": "Environment prepared. To start, run: docker exec infra-automation_api_1 cat /app/data/environments/e0aedc7e-8c09-4fd0-a4b4-c9956521fdc3/setup_and_start.sh > /tmp/setup.sh && chmod +x /tmp/setup.sh && /tmp/setup.sh"
+  },
+  "7c2a26e0-b5dd-4ea8-8391-dab46a5aa72a": {
+    "environment_id": "7c2a26e0-b5dd-4ea8-8391-dab46a5aa72a",
+    "environment_name": "auto-env-4",
+    "environment_type": "development",
+    "user_id": "user123",
+    "tools": [
+      "jira",
+      "gitlab"
+    ],
+    "custom_domain": null,
+    "resource_limits": {
+      "cpu": 2,
+      "memory": "4Gi"
+    },
+    "description": "Automated environment with host deployment",
+    "created_at": "2025-03-15T05:17:19.942130",
+    "status": "running",
+    "tool_endpoints": {
+      "jira": "http://localhost:8113",
+      "gitlab": "http://localhost:8962",
+      "dashboard": "http://localhost:8114"
+    },
+    "credentials": {
+      "jira": {
+        "username": "admin",
+        "password": "admin"
+      },
+      "gitlab": {
+        "username": "root",
+        "password": "password"
+      }
+    },
+    "access_url": "http://localhost:8114",
+    "message": "Environment prepared. To start, run: docker exec infra-automation_api_1 cat /app/data/environments/7c2a26e0-b5dd-4ea8-8391-dab46a5aa72a/setup_and_start.sh > /tmp/setup.sh && chmod +x /tmp/setup.sh && /tmp/setup.sh"
+  },
+  "d3fd4554-420a-4802-bda9-4756abb97495": {
+    "environment_id": "d3fd4554-420a-4802-bda9-4756abb97495",
+    "environment_name": "auto-env-5",
+    "environment_type": "development",
+    "user_id": "user123",
+    "tools": [
+      "jira",
+      "gitlab"
+    ],
+    "custom_domain": null,
+    "resource_limits": {
+      "cpu": 2,
+      "memory": "4Gi"
+    },
+    "description": "Automated environment with host deployment",
+    "created_at": "2025-03-15T05:18:57.070096",
+    "status": "running",
+    "tool_endpoints": {
+      "jira": "http://localhost:8091",
+      "gitlab": "http://localhost:8940",
+      "dashboard": "http://localhost:8092"
+    },
+    "credentials": {
+      "jira": {
+        "username": "admin",
+        "password": "admin"
+      },
+      "gitlab": {
+        "username": "root",
+        "password": "password"
+      }
+    },
+    "access_url": "http://localhost:8092",
+    "message": "Environment prepared. To start, run: docker exec infra-automation_api_1 cat /app/data/environments/d3fd4554-420a-4802-bda9-4756abb97495/setup_and_start.sh > /tmp/setup.sh && chmod +x /tmp/setup.sh && /tmp/setup.sh"
+  },
+  "6ada80c6-d127-4875-b237-b86c13555f81": {
+    "environment_id": "6ada80c6-d127-4875-b237-b86c13555f81",
+    "environment_name": "auto-env-6",
+    "environment_type": "development",
+    "user_id": "user123",
+    "tools": [
+      "jira",
+      "gitlab"
+    ],
+    "custom_domain": null,
+    "resource_limits": {
+      "cpu": 2,
+      "memory": "4Gi"
+    },
+    "description": "Automated environment with host deployment",
+    "created_at": "2025-03-15T05:21:54.955349",
+    "status": "running",
+    "tool_endpoints": {
+      "jira": "http://localhost:8087",
+      "gitlab": "http://localhost:8936",
+      "dashboard": "http://localhost:8088"
+    },
+    "credentials": {
+      "jira": {
+        "username": "admin",
+        "password": "admin"
+      },
+      "gitlab": {
+        "username": "root",
+        "password": "password"
+      }
+    },
+    "access_url": "http://localhost:8088",
+    "message": "Environment prepared. To start, run: docker exec infra-automation_api_1 cat /app/data/environments/6ada80c6-d127-4875-b237-b86c13555f81/setup_and_start.sh > /tmp/setup.sh && chmod +x /tmp/setup.sh && /tmp/setup.sh"
+  },
+  "a8374274-290e-4c31-beed-51c41a7b74b1": {
+    "environment_id": "a8374274-290e-4c31-beed-51c41a7b74b1",
+    "environment_name": "wordpress-env",
+    "environment_type": "development",
+    "user_id": "user123",
+    "tools": [
+      "jira",
+      "gitlab"
+    ],
+    "custom_domain": null,
+    "resource_limits": {
+      "cpu": 2,
+      "memory": "4Gi"
+    },
+    "description": "Automated environment with host deployment",
+    "created_at": "2025-03-15T05:33:59.098901",
+    "status": "prepared",
+    "tool_endpoints": {
+      "jira": "http://localhost:8092",
+      "gitlab": "http://localhost:8941",
+      "dashboard": "http://localhost:8093"
+    },
+    "credentials": {
+      "jira": {
+        "username": "admin",
+        "password": "admin"
+      },
+      "gitlab": {
+        "username": "root",
+        "password": "password"
+      }
+    },
+    "access_url": "http://localhost:8093",
+    "message": "Environment prepared. To start, run: docker exec infra-automation_api_1 cat /app/data/environments/a8374274-290e-4c31-beed-51c41a7b74b1/setup_and_start.sh > /tmp/setup.sh && chmod +x /tmp/setup.sh && /tmp/setup.sh"
+  }
+}

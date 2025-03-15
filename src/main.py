@@ -57,6 +57,27 @@ app.state.llm_service = llm_service
 app.state.vector_db = vector_db
 app.state.architecture_agent = architecture_agent
 
+# Initialize and integrate workflow components
+from src.workflow.api import router as workflow_router, initialize_orchestrator
+from src.agents.base.base_agent import BaseAgent
+from src.integration import integrate_systems, run_initialization_tasks
+import asyncio
+
+# Create a dictionary of available agents
+agents = {
+    "architecture": architecture_agent,
+    # Add other agents as needed
+}
+
+# Use the integration module to properly set up the system
+integrated_components = integrate_systems(app, agents)
+orchestrator = integrated_components["orchestrator"]
+
+# Run initialization tasks in the background
+@app.on_event("startup")
+async def startup_event():
+    await run_initialization_tasks(agents)
+
 class InfrastructureRequest(BaseModel):
     """Request model for infrastructure generation."""
     task: str

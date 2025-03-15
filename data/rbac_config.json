@@ -11,8 +11,8 @@
       "name": "reader",
       "description": "Read-only access to resources",
       "permissions": [
-        "*:read",
         "*:describe",
+        "*:read",
         "*:list"
       ]
     },
@@ -30,19 +30,19 @@
       "name": "security",
       "description": "Security agent role",
       "permissions": [
-        "ansible:read",
-        "security:*",
         "terraform:read",
         "cloudformation:read",
-        "jenkins:read"
+        "security:*",
+        "jenkins:read",
+        "ansible:read"
       ]
     },
     {
       "name": "vault",
       "description": "Vault agent role",
       "permissions": [
-        "vault:*",
-        "secrets:*"
+        "secrets:*",
+        "vault:*"
       ]
     },
     {
@@ -78,11 +78,57 @@
       "name": "argocd",
       "description": "ArgoCD agent role",
       "permissions": [
+        "kubernetes:read",
         "argocd:*",
-        "kubernetes:list",
-        "kubernetes:read"
+        "kubernetes:list"
       ]
     }
   ],
-  "agent_roles": {}
+  "agent_roles": {
+    "infrastructure": [
+      "infrastructure"
+    ],
+    "architecture": [
+      "reader"
+    ],
+    "security": [
+      "security"
+    ],
+    "cost": [
+      "reader"
+    ],
+    "terraform_module": [
+      "reader"
+    ],
+    "jira": [
+      "jira"
+    ],
+    "confluence": [
+      "confluence"
+    ],
+    "github": [
+      "github"
+    ],
+    "nexus": [
+      "reader"
+    ],
+    "kubernetes": [
+      "kubernetes"
+    ],
+    "argocd": [
+      "argocd"
+    ],
+    "vault": [
+      "vault"
+    ],
+    "security_scanner": [
+      "reader"
+    ],
+    "deployment": [
+      "reader"
+    ],
+    "onboarding": [
+      "reader"
+    ]
+  }
 }

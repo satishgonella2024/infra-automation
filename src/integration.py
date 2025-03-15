@@ -87,6 +87,16 @@ async def run_initialization_tasks(agents: Dict[str, BaseAgent]):
     except Exception as e:
         logger.error(f"Error creating predefined workflows: {str(e)}")
     
+    # Initialize workflow templates
+    try:
+        from src.workflow.init import initialize_workflow_templates
+        from src.workflow.api import orchestrator
+        
+        if orchestrator:
+            await initialize_workflow_templates(orchestrator)
+    except Exception as e:
+        logger.error(f"Error initializing workflow templates: {str(e)}")
+    
     logger.info("Initialization tasks completed!")
 
 async def _create_predefined_workflows(agents: Dict[str, BaseAgent]):

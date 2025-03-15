@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from src.agents.base.base_agent import BaseAgent
 from src.workflow.orchestrator import WorkflowOrchestrator
 from src.workflow.schema import WorkflowDefinition, WorkflowStep, AgentCapabilities
+from src.workflow.init import initialize_workflow_templates
 
 # Create a router
 router = APIRouter(
@@ -30,7 +31,19 @@ orchestrator = None
 
 def get_orchestrator() -> WorkflowOrchestrator:
     """Get the global orchestrator instance."""
+    global orchestrator
     if orchestrator is None:
+        # Try to initialize the orchestrator with available agents
+        from src.api.server import agents
+        if agents:
+            try:
+                orchestrator = WorkflowOrchestrator(agents)
+                logger.info("Workflow orchestrator initialized on-demand")
+                return orchestrator
+            except Exception as e:
+                logger.error(f"Failed to initialize orchestrator on-demand: {str(e)}")
+                
+        # If we still don't have an orchestrator, raise an exception
         raise HTTPException(
             status_code=503,
             detail="Workflow orchestrator not initialized"
@@ -86,6 +99,11 @@ class WorkflowTemplateRequest(BaseModel):
     parameters: Optional[Dict[str, Any]] = Field(None, description="Template parameters")
 
 # --- API Endpoints ---
+
+@router.get("/test", response_model=Dict[str, str])
+async def test_workflow_api():
+    """Test endpoint to verify the workflow API is accessible."""
+    return {"status": "ok", "message": "Workflow API is accessible"}
 
 @router.get("/", response_model=List[WorkflowDefinitionResponse])
 async def list_workflow_definitions(
@@ -345,16 +363,14 @@ async def list_workflow_instances(
     definition_id: Optional[str] = None,
     orchestrator: WorkflowOrchestrator = Depends(get_orchestrator)
 ):
-    """List workflow instances."""
+    """List all workflow instances."""
     try:
-        # List workflow instances
         instances = await orchestrator.list_workflow_instances(
             status=status,
             definition_id=definition_id,
             limit=limit,
             offset=offset
         )
-        
         return instances
     except Exception as e:
         raise HTTPException(
@@ -414,304 +430,40 @@ async def cancel_workflow_instance(
 async def list_agent_capabilities(
     orchestrator: WorkflowOrchestrator = Depends(get_orchestrator)
 ):
-    """List agent capabilities for use in the workflow editor."""
-    agents = orchestrator.agents
-    
-    # Extract capabilities from agents
-    capabilities = {}
-    for agent_id, agent in agents.items():
-        if not agent:
-            continue
-            
-        agent_info = agent.serialize()
-        
-        # Add agent capabilities
-        capabilities[agent_id] = {
-            "name": agent_info.get("name", agent_id),
-            "description": agent_info.get("description", ""),
-            "capabilities": agent_info.get("capabilities", []),
-            "actions": await _get_agent_actions(agent)
-        }
-    
-    return capabilities
+    """List all available agents and their capabilities."""
+    try:
+        agent_capabilities = {}
+        for name, agent in orchestrator.agents.items():
+            agent_capabilities[name] = await _get_agent_actions(agent)
+        return agent_capabilities
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error listing agent capabilities: {str(e)}"
+        )
 
 async def _get_agent_actions(agent: BaseAgent) -> Dict[str, Dict[str, Any]]:
-    """Extract available actions from an agent."""
-    # This is a simplified version - in a full implementation,
-    # agents would provide their actions through a standard interface
-    
-    # Basic actions for all agents
-    basic_actions = {
-        "process": {
-            "name": "Process",
-            "description": "Process a generic request",
-            "parameters": {
-                "action": {
-                    "type": "string",
-                    "description": "The action to perform",
-                    "required": True
-                },
-                "parameters": {
-                    "type": "object",
-                    "description": "Parameters for the action",
-                    "required": True
-                }
-            }
-        }
-    }
-    
-    # Agent-specific actions based on capabilities
-    agent_actions = {}
+    """Get the actions available for an agent."""
+    actions = {}
     
     # Get agent capabilities
     capabilities = getattr(agent, "capabilities", [])
     
-    # Map capabilities to actions
-    capability_mappings = {
-        # Infrastructure agent
-        "terraform_generation": {
-            "generate_terraform": {
-                "name": "Generate Terraform",
-                "description": "Generate Terraform code from requirements",
-                "parameters": {
-                    "task": {
-                        "type": "string",
-                        "description": "Description of what to generate",
-                        "required": True
-                    },
-                    "cloud_provider": {
-                        "type": "string",
-                        "description": "Target cloud provider (aws, azure, gcp)",
-                        "default": "aws",
-                        "required": False
-                    },
-                    "requirements": {
-                        "type": "object",
-                        "description": "Specific infrastructure requirements",
-                        "required": False
-                    }
-                }
-            }
-        },
-        
-        # Security agent
-        "vulnerability_scanning": {
-            "review": {
-                "name": "Security Review",
-                "description": "Review infrastructure code for security vulnerabilities",
-                "parameters": {
-                    "code": {
-                        "type": "string",
-                        "description": "Infrastructure code to review",
-                        "required": True
-                    },
-                    "cloud_provider": {
-                        "type": "string",
-                        "description": "Target cloud provider (aws, azure, gcp)",
-                        "default": "aws",
-                        "required": False
-                    },
-                    "iac_type": {
-                        "type": "string",
-                        "description": "Type of IaC (terraform, ansible, etc.)",
-                        "default": "terraform",
-                        "required": False
-                    }
-                }
-            }
-        },
-        
-        # Cost agent
-        "cost_optimization": {
-            "optimize": {
-                "name": "Cost Optimization",
-                "description": "Optimize infrastructure code for cost",
-                "parameters": {
-                    "code": {
-                        "type": "string",
-                        "description": "Infrastructure code to optimize",
-                        "required": True
-                    },
-                    "cloud_provider": {
-                        "type": "string",
-                        "description": "Target cloud provider (aws, azure, gcp)",
-                        "default": "aws",
-                        "required": False
-                    },
-                    "iac_type": {
-                        "type": "string",
-                        "description": "Type of IaC (terraform, ansible, etc.)",
-                        "default": "terraform",
-                        "required": False
-                    }
-                }
-            }
-        },
-        
-        # Jira agent
-        "issue_creation": {
-            "create_issue": {
-                "name": "Create Jira Issue",
-                "description": "Create a new Jira issue",
-                "parameters": {
-                    "project_key": {
-                        "type": "string",
-                        "description": "Jira project key",
-                        "required": True
-                    },
-                    "issue_type": {
-                        "type": "string",
-                        "description": "Issue type (Bug, Story, etc.)",
-                        "default": "Story",
-                        "required": False
-                    },
-                    "summary": {
-                        "type": "string",
-                        "description": "Issue summary",
-                        "required": True
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Issue description",
-                        "required": False
-                    }
-                }
-            },
-            "update_issue": {
-                "name": "Update Jira Issue",
-                "description": "Update an existing Jira issue",
-                "parameters": {
-                    "issue_key": {
-                        "type": "string",
-                        "description": "Jira issue key",
-                        "required": True
-                    },
-                    "fields": {
-                        "type": "object",
-                        "description": "Fields to update",
-                        "required": True
-                    }
-                }
-            }
-        },
-        
-        # GitHub agent
-        "repository_management": {
-            "create_repository": {
-                "name": "Create GitHub Repository",
-                "description": "Create a new GitHub repository",
-                "parameters": {
-                    "name": {
-                        "type": "string",
-                        "description": "Repository name",
-                        "required": True
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Repository description",
-                        "required": False
-                    },
-                    "private": {
-                        "type": "boolean",
-                        "description": "Whether the repository should be private",
-                        "default": False,
-                        "required": False
-                    }
-                }
-            }
-        },
-        "branch_management": {
-            "create_branch": {
-                "name": "Create GitHub Branch",
-                "description": "Create a new branch in a GitHub repository",
-                "parameters": {
-                    "repo": {
-                        "type": "string",
-                        "description": "Repository name",
-                        "required": True
-                    },
-                    "branch": {
-                        "type": "string",
-                        "description": "Branch name",
-                        "required": True
-                    },
-                    "base_branch": {
-                        "type": "string",
-                        "description": "Base branch",
-                        "default": "main",
-                        "required": False
-                    }
-                }
-            }
-        },
-        "pull_request_automation": {
-            "create_pr": {
-                "name": "Create GitHub PR",
-                "description": "Create a pull request in GitHub",
-                "parameters": {
-                    "repo": {
-                        "type": "string",
-                        "description": "Repository name",
-                        "required": True
-                    },
-                    "title": {
-                        "type": "string",
-                        "description": "PR title",
-                        "required": True
-                    },
-                    "body": {
-                        "type": "string",
-                        "description": "PR description",
-                        "required": False
-                    },
-                    "head": {
-                        "type": "string",
-                        "description": "Head branch",
-                        "required": True
-                    },
-                    "base": {
-                        "type": "string",
-                        "description": "Base branch",
-                        "default": "main",
-                        "required": False
-                    }
-                }
-            }
-        },
-        
-        # Confluence agent
-        "page_creation": {
-            "create_page": {
-                "name": "Create Confluence Page",
-                "description": "Create a new Confluence page",
-                "parameters": {
-                    "space_key": {
-                        "type": "string",
-                        "description": "Confluence space key",
-                        "required": True
-                    },
-                    "title": {
-                        "type": "string",
-                        "description": "Page title",
-                        "required": True
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "Page content",
-                        "required": True
-                    }
-                }
-            }
-        }
-    }
-    
-    # Add actions based on capabilities
+    # Convert capabilities to actions
     for capability in capabilities:
-        if capability in capability_mappings:
-            agent_actions.update(capability_mappings[capability])
+        action_name = capability.replace("_", " ").title()
+        actions[capability] = {
+            "name": action_name,
+            "description": f"Perform {action_name.lower()} operation",
+            "parameters": {}
+        }
     
-    # Combine basic and agent-specific actions
-    return {**basic_actions, **agent_actions}
+    return {
+        "name": getattr(agent, "name", agent.__class__.__name__),
+        "description": getattr(agent, "description", "AI agent for infrastructure automation"),
+        "capabilities": capabilities,
+        "actions": actions
+    }
 
 # Initialize the orchestrator
 def initialize_orchestrator(agents: Dict[str, BaseAgent]):
