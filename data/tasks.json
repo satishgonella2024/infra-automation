@@ -5530,5 +5530,667 @@
       "iac_type": "terraform"
     },
     "timestamp": "2025-03-14 16:18:41.355156"
+  },
+  "c543181d-6100-4471-a91d-ced62033b79b": {
+    "type": "infrastructure_generation",
+    "request": {
+      "task": "Deploy a simple web application with EKS and S3",
+      "requirements": {},
+      "cloud_provider": "aws",
+      "iac_type": "terraform"
+    },
+    "result": {
+      "task_id": "c543181d-6100-4471-a91d-ced62033b79b",
+      "code": "provider \"aws\" {\n  region = var.aws_region\n}\n\nvariable \"environment\" {\n  type = string\n}\n\noutput \"eks_cluster_name\" {\n  value = aws_eks_cluster.this.name\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.this.bucket\n}\n\nmodule \"eks\" {\n  source = \"github.com/aws/eks-infra/modules/cluster\"\n\n  providers = {\n    aws = aws\n  }\n\n  cluster_name = \"${var.environment}-eks\"\n  subnets      = var.subnet_ids\n\n  vpc_resolvers = [\n    {\n      ip       = \"8.8.8.8\"\n      type     = \"IPv4\"\n      search   = true\n      priority = 1\n    }\n  ]\n}\n\nmodule \"s3\" {\n  source = \"github.com/aws/terraform-modules/s3-bucket\"\n\n  providers = {\n    aws = aws\n  }\n\n  bucket_name = \"${var.environment}-s3\"\n  acl         = \"private\"\n\n  lifecycle {\n    ignore_changes = true\n  }\n}\n\nresource \"aws_eks_cluster\" \"this\" {\n  name     = module.eks.cluster_name\n  role_arn = aws_iam_role.this.arn\n\n  vpc_resolvers = [\n    {\n      ip       = \"8.8.8.8\"\n      type     = \"IPv4\"\n      search   = true\n      priority = 1\n    }\n  ]\n}\n\nresource \"aws_iam_role\" \"this\" {\n  name        = \"${var.environment}-eks-cluster-role\"\n  description = \"EKS cluster role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\",\n      \"Sid\": \"\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy_attachment\" \"this\" {\n  role       = aws_iam_role.this.name\n  policy_arn = \"arn:aws:iam::aws:policy/AmazonEKSClusterPolicy\"\n}\n\nresource \"aws_eks_node_group\" \"this\" {\n  cluster_name    = module.eks.cluster_name\n  node_group_name = \"${var.environment}-node-group\"\n  node_role_arn   = aws_iam_role.node.name\n\n  instance_types = [\"t3.small\"]\n  num_nodes      = 2\n}\n\nresource \"aws_iam_role\" \"node\" {\n  name        = \"${var.environment}-eks-node-role\"\n  description = \"EKS node role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\",\n      \"Sid\": \"\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy_attachment\" \"node\" {\n  role       = aws_iam_role.node.name\n  policy_arn = \"arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy\"\n}\n\nresource \"aws_s3_bucket\" \"this\" {\n  bucket = module.s3.bucket_name\n  acl    = \"private\"\n\n  lifecycle {\n    ignore_changes = true\n  }\n\n  tags = {\n    Environment = var.environment\n  }\n}\n\nresource \"aws_eks_cluster_config\" \"this\" {\n  cluster_name = aws_eks_cluster.this.name\n\n  lifecycle {\n    create_before_destroy = true\n  }\n}",
+      "metadata": {
+        "resource_count": 7,
+        "module_count": 2,
+        "estimated_provisioning_time_minutes": 24,
+        "cloud_provider": "aws",
+        "generated_timestamp": 1741976894.903557,
+        "similar_patterns_used": 0,
+        "similar_generations_used": 0,
+        "used_rag": false,
+        "architecture_findings": {
+          "reliability": [
+            {
+              "finding": "The use of a single AWS region (us-west-2) may limit the availability and scalability of the infrastructure."
+            }
+          ],
+          "security": [
+            {
+              "finding": "The IAM roles assume role policies do not specify any VPC or subnet restrictions, which could potentially allow nodes to be launched in unintended locations."
+            },
+            {
+              "finding": "The S3 bucket ACL is set to public-read-write, which may not be suitable for a production environment. Consider using a more restrictive ACL or setting up an S3 bucket policy instead."
+            }
+          ],
+          "cost_optimization": [
+            {
+              "recommendation": "Consider setting up a reserved instance for the EC2 instances used by the EKS nodes to reduce costs."
+            },
+            {
+              "finding": "The use of t3.medium instances for EKS nodes may not be the most cost-effective option. Consider using a more efficient instance type or resizing the instances based on usage patterns."
+            }
+          ],
+          "performance": [
+            {
+              "finding": "The use of a single availability zone (us-west-2) may limit the performance and scalability of the infrastructure. Consider deploying to multiple AZs for better fault tolerance and high availability."
+            },
+            {
+              "recommendation": "Consider setting up an EKS cluster with multiple control plane instances for better performance, reliability, and scalability."
+            }
+          ],
+          "operational_excellence": [
+            {
+              "finding": "The Terraform code does not provide any mechanism for rolling back or reverting changes in case of errors. Consider setting up a Terraform state file and using it to manage the infrastructure configuration."
+            },
+            {
+              "recommendation": "Consider setting up CloudWatch alarms and logging for the EKS cluster and S3 bucket to monitor their performance, security, and availability."
+            }
+          ],
+          "critical_issues": [
+            {
+              "finding": "The Terraform code does not handle errors or exceptions properly. Consider using try-catch blocks or error handling mechanisms to prevent unexpected behavior."
+            }
+          ],
+          "recommendations": [
+            {
+              "recommendation": "Consider setting up a CI/CD pipeline to automate the deployment and management of the infrastructure configuration."
+            },
+            {
+              "recommendation": "Consider setting up an AWS Well-Architected Framework (WAF) monitoring dashboard to track key performance metrics and identify areas for improvement."
+            }
+          ]
+        },
+        "security_findings": {
+          "vulnerabilities": [
+            {
+              "severity": "high",
+              "title": "Unsecured VPC Resolver Configuration",
+              "description": "The VPC resolver configuration uses an IP address (8.8.8.8) that may not be trusted by all organizations, and does not specify a secure protocol for DNS resolution.",
+              "remediation": "Configure the VPC resolver to use a trusted and verified IP address or domain name, and ensure that DNS resolution is performed over a secure protocol such as HTTPS."
+            },
+            {
+              "severity": "high",
+              "title": "Unencrypted Storage for aws",
+              "description": "Storage resources are not configured with encryption",
+              "remediation": "Enable server-side encryption for all storage resources"
+            },
+            {
+              "severity": "medium",
+              "title": "S3 Bucket Default ACL",
+              "description": "The S3 bucket default ACL is set to 'private', which may not be suitable for all use cases. Additionally, the bucket name is not prefixed with a unique identifier (e.g., AWS account ID) to prevent accidental exposure.",
+              "remediation": "Configure the S3 bucket to use a more restrictive default ACL, such as 'bucket-owner-full-control', and consider prefixing the bucket name with a unique identifier."
+            },
+            {
+              "severity": "low",
+              "title": "Insecure Node Group Instance Types",
+              "description": "The node group instance types (t3.small) may not be suitable for all use cases, as they do not provide any encryption or other advanced security features.",
+              "remediation": "Consider using more secure node group instance types, such as those with built-in encryption or other advanced security features."
+            }
+          ],
+          "summary": {
+            "remediated_issues_count": 0,
+            "summary": "Remediation failed to produce valid code"
+          },
+          "risk_score": 0,
+          "compliance_results": {
+            "CIS AWS Benchmark": [
+              {
+                "control": "1.2",
+                "finding": "The VPC resolver configuration does not specify a secure protocol for DNS resolution"
+              },
+              {
+                "control": "5.1",
+                "finding": "The S3 bucket default ACL is set to 'private', which may not be suitable for all use cases"
+              }
+            ],
+            "AWS Well-Architected Security Pillar": [
+              {
+                "control": "Security 2.1",
+                "finding": "The VPC resolver configuration uses an IP address (8.8.8.8) that may not be trusted by all organizations"
+              },
+              {
+                "control": "Security 4.3",
+                "finding": "The S3 bucket default ACL is set to 'private', which may not be suitable for all use cases"
+              }
+            ]
+          }
+        }
+      },
+      "thoughts": "Let's break down the task step by step:\n\n**Task:** Deploy a simple web application with EKS (Elastic Container Service for Kubernetes) and S3 (Simple Storage Service)\n\n**Step 1: Gather Information**\n\nTo complete this task, I'll need to know the following:\n\n* The desired architecture for the web application (e.g., monolithic, microservices-based)\n* The requirements for the web application (e.g., scalability, availability, security)\n* The desired S3 bucket name and any specific configuration requirements\n* Any existing infrastructure or dependencies that should be taken into account\n\n**Potential Challenges or Edge Cases:**\n\n1. **Network Policies**: EKS requires a VPC and subnets to deploy containers. I'll need to ensure that the correct VPC and subnets are chosen.\n2. **IAM Roles**: I'll need to create IAM roles for the EKS cluster, S3 bucket, and web application to manage access control and permissions.\n3. **Security Group Configuration**: I'll need to configure security groups for the EKS cluster and S3 bucket to allow incoming traffic on specific ports.\n\n**Best Practices:**\n\n1. **Modularize Infrastructure Code**: Break down the infrastructure into smaller, manageable modules (e.g., VPC, subnets, security groups) to make it easier to maintain and update.\n2. **Use Terraform for EKS**: Terraform has built-in support for EKS, making it a great choice for deploying and managing the cluster.\n3. **Use Ansible for S3 Bucket Creation**: Ansible is well-suited for creating and managing S3 buckets, as it allows for idempotent operations.\n\n**Optimal Approach:**\n\n1. **Terraform for EKS Deployment**: Use Terraform to deploy the EKS cluster, VPC, subnets, security groups, and IAM roles.\n2. **Ansible for S3 Bucket Creation**: Use Ansible to create the S3 bucket with the desired configuration.\n3. **Jenkins Generation for Web Application Deployment**: Use Jenkins to generate a pipeline that deploys the web application to the EKS cluster.\n\n**Capabilities at My Disposal:**\n\n1. **Terraform Generation**: Use Terraform to generate infrastructure code for deploying EKS and related resources.\n2. **Ansible Generation**: Use Ansible to generate playbooks for creating and managing S3 buckets.\n3. **Jenkins Generation**: Use Jenkins to generate pipelines for automating the deployment of web applications.\n\nBy following this approach, I'll be able to efficiently deploy a simple web application with EKS and S3 while ensuring that security, scalability, and availability are well-managed.\n\nWhat's next?",
+      "architecture_findings": {
+        "reliability": [
+          {
+            "finding": "The use of a single AWS region (us-west-2) may limit the availability and scalability of the infrastructure."
+          }
+        ],
+        "security": [
+          {
+            "finding": "The IAM roles assume role policies do not specify any VPC or subnet restrictions, which could potentially allow nodes to be launched in unintended locations."
+          },
+          {
+            "finding": "The S3 bucket ACL is set to public-read-write, which may not be suitable for a production environment. Consider using a more restrictive ACL or setting up an S3 bucket policy instead."
+          }
+        ],
+        "cost_optimization": [
+          {
+            "recommendation": "Consider setting up a reserved instance for the EC2 instances used by the EKS nodes to reduce costs."
+          },
+          {
+            "finding": "The use of t3.medium instances for EKS nodes may not be the most cost-effective option. Consider using a more efficient instance type or resizing the instances based on usage patterns."
+          }
+        ],
+        "performance": [
+          {
+            "finding": "The use of a single availability zone (us-west-2) may limit the performance and scalability of the infrastructure. Consider deploying to multiple AZs for better fault tolerance and high availability."
+          },
+          {
+            "recommendation": "Consider setting up an EKS cluster with multiple control plane instances for better performance, reliability, and scalability."
+          }
+        ],
+        "operational_excellence": [
+          {
+            "finding": "The Terraform code does not provide any mechanism for rolling back or reverting changes in case of errors. Consider setting up a Terraform state file and using it to manage the infrastructure configuration."
+          },
+          {
+            "recommendation": "Consider setting up CloudWatch alarms and logging for the EKS cluster and S3 bucket to monitor their performance, security, and availability."
+          }
+        ],
+        "critical_issues": [
+          {
+            "finding": "The Terraform code does not handle errors or exceptions properly. Consider using try-catch blocks or error handling mechanisms to prevent unexpected behavior."
+          }
+        ],
+        "recommendations": [
+          {
+            "recommendation": "Consider setting up a CI/CD pipeline to automate the deployment and management of the infrastructure configuration."
+          },
+          {
+            "recommendation": "Consider setting up an AWS Well-Architected Framework (WAF) monitoring dashboard to track key performance metrics and identify areas for improvement."
+          }
+        ]
+      },
+      "security_findings": {
+        "vulnerabilities": [
+          {
+            "severity": "high",
+            "title": "Unsecured VPC Resolver Configuration",
+            "description": "The VPC resolver configuration uses an IP address (8.8.8.8) that may not be trusted by all organizations, and does not specify a secure protocol for DNS resolution.",
+            "remediation": "Configure the VPC resolver to use a trusted and verified IP address or domain name, and ensure that DNS resolution is performed over a secure protocol such as HTTPS."
+          },
+          {
+            "severity": "high",
+            "title": "Unencrypted Storage for aws",
+            "description": "Storage resources are not configured with encryption",
+            "remediation": "Enable server-side encryption for all storage resources"
+          },
+          {
+            "severity": "medium",
+            "title": "S3 Bucket Default ACL",
+            "description": "The S3 bucket default ACL is set to 'private', which may not be suitable for all use cases. Additionally, the bucket name is not prefixed with a unique identifier (e.g., AWS account ID) to prevent accidental exposure.",
+            "remediation": "Configure the S3 bucket to use a more restrictive default ACL, such as 'bucket-owner-full-control', and consider prefixing the bucket name with a unique identifier."
+          },
+          {
+            "severity": "low",
+            "title": "Insecure Node Group Instance Types",
+            "description": "The node group instance types (t3.small) may not be suitable for all use cases, as they do not provide any encryption or other advanced security features.",
+            "remediation": "Consider using more secure node group instance types, such as those with built-in encryption or other advanced security features."
+          }
+        ],
+        "summary": {
+          "remediated_issues_count": 0,
+          "summary": "Remediation failed to produce valid code"
+        },
+        "risk_score": 0,
+        "compliance_results": {
+          "CIS AWS Benchmark": [
+            {
+              "control": "1.2",
+              "finding": "The VPC resolver configuration does not specify a secure protocol for DNS resolution"
+            },
+            {
+              "control": "5.1",
+              "finding": "The S3 bucket default ACL is set to 'private', which may not be suitable for all use cases"
+            }
+          ],
+          "AWS Well-Architected Security Pillar": [
+            {
+              "control": "Security 2.1",
+              "finding": "The VPC resolver configuration uses an IP address (8.8.8.8) that may not be trusted by all organizations"
+            },
+            {
+              "control": "Security 4.3",
+              "finding": "The S3 bucket default ACL is set to 'private', which may not be suitable for all use cases"
+            }
+          ]
+        }
+      },
+      "iac_type": "terraform",
+      "cloud_provider": "aws"
+    },
+    "original_code": "```\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"environment\" {\n  type = string\n}\n\noutput \"eks_cluster_name\" {\n  value = aws_eks_cluster.this.name\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.this.bucket\n}\n\nmodule \"eks\" {\n  source = \"github.com/aws/eks-infra/modules/cluster\"\n\n  providers = {\n    aws = aws\n  }\n\n  cluster_name = \"${var.environment}-eks\"\n  subnets      = [\"subnet-0123456789abcdef0\", \"subnet-0987654321fedcba0\"]\n}\n\nmodule \"s3\" {\n  source = \"github.com/aws/terraform-modules/s3-bucket\"\n\n  providers = {\n    aws = aws\n  }\n\n  bucket_name = \"${var.environment}-s3\"\n  acl         = \"public-read-write\"\n}\n\nresource \"aws_eks_cluster\" \"this\" {\n  name     = module.eks.cluster_name\n  role_arn = aws_iam_role.this.arn\n\n  vpc_resolvers = [\n    {\n      ip       = \"8.8.8.8\"\n      type     = \"IPv4\"\n      search   = true\n      priority = 1\n    }\n  ]\n}\n\nresource \"aws_iam_role\" \"this\" {\n  name        = \"${var.environment}-eks-cluster-role\"\n  description = \"EKS cluster role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\",\n      \"Sid\": \"\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy_attachment\" \"this\" {\n  role       = aws_iam_role.this.name\n  policy_arn = \"arn:aws:iam::aws:policy/AmazonEKSClusterPolicy\"\n}\n\nresource \"aws_eks_node_group\" \"this\" {\n  cluster_name    = module.eks.cluster_name\n  node_group_name = \"${var.environment}-node-group\"\n  node_role_arn   = aws_iam_role.node.name\n\n  instance_types = [\"t3.medium\"]\n  num_nodes      = 2\n}\n\nresource \"aws_iam_role\" \"node\" {\n  name        = \"${var.environment}-eks-node-role\"\n  description = \"EKS node role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\",\n      \"Sid\": \"\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy_attachment\" \"node\" {\n  role       = aws_iam_role.node.name\n  policy_arn = \"arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy\"\n}\n\nresource \"aws_s3_bucket\" \"this\" {\n  bucket = module.s3.bucket_name\n  acl    = module.s3.acl\n\n  tags = {\n    Environment = var.environment\n  }\n}\n```",
+    "improved_code": "provider \"aws\" {\n  region = var.aws_region\n}\n\nvariable \"environment\" {\n  type = string\n}\n\noutput \"eks_cluster_name\" {\n  value = aws_eks_cluster.this.name\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.this.bucket\n}\n\nmodule \"eks\" {\n  source = \"github.com/aws/eks-infra/modules/cluster\"\n\n  providers = {\n    aws = aws\n  }\n\n  cluster_name = \"${var.environment}-eks\"\n  subnets      = var.subnet_ids\n\n  vpc_resolvers = [\n    {\n      ip       = \"8.8.8.8\"\n      type     = \"IPv4\"\n      search   = true\n      priority = 1\n    }\n  ]\n}\n\nmodule \"s3\" {\n  source = \"github.com/aws/terraform-modules/s3-bucket\"\n\n  providers = {\n    aws = aws\n  }\n\n  bucket_name = \"${var.environment}-s3\"\n  acl         = \"private\"\n\n  lifecycle {\n    ignore_changes = true\n  }\n}\n\nresource \"aws_eks_cluster\" \"this\" {\n  name     = module.eks.cluster_name\n  role_arn = aws_iam_role.this.arn\n\n  vpc_resolvers = [\n    {\n      ip       = \"8.8.8.8\"\n      type     = \"IPv4\"\n      search   = true\n      priority = 1\n    }\n  ]\n}\n\nresource \"aws_iam_role\" \"this\" {\n  name        = \"${var.environment}-eks-cluster-role\"\n  description = \"EKS cluster role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\",\n      \"Sid\": \"\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy_attachment\" \"this\" {\n  role       = aws_iam_role.this.name\n  policy_arn = \"arn:aws:iam::aws:policy/AmazonEKSClusterPolicy\"\n}\n\nresource \"aws_eks_node_group\" \"this\" {\n  cluster_name    = module.eks.cluster_name\n  node_group_name = \"${var.environment}-node-group\"\n  node_role_arn   = aws_iam_role.node.name\n\n  instance_types = [\"t3.small\"]\n  num_nodes      = 2\n}\n\nresource \"aws_iam_role\" \"node\" {\n  name        = \"${var.environment}-eks-node-role\"\n  description = \"EKS node role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\",\n      \"Sid\": \"\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy_attachment\" \"node\" {\n  role       = aws_iam_role.node.name\n  policy_arn = \"arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy\"\n}\n\nresource \"aws_s3_bucket\" \"this\" {\n  bucket = module.s3.bucket_name\n  acl    = \"private\"\n\n  lifecycle {\n    ignore_changes = true\n  }\n\n  tags = {\n    Environment = var.environment\n  }\n}\n\nresource \"aws_eks_cluster_config\" \"this\" {\n  cluster_name = aws_eks_cluster.this.name\n\n  lifecycle {\n    create_before_destroy = true\n  }\n}",
+    "secured_code": "provider \"aws\" {\n  region = var.aws_region\n}\n\nvariable \"environment\" {\n  type = string\n}\n\noutput \"eks_cluster_name\" {\n  value = aws_eks_cluster.this.name\n}\n\noutput \"s3_bucket_name\" {\n  value = aws_s3_bucket.this.bucket\n}\n\nmodule \"eks\" {\n  source = \"github.com/aws/eks-infra/modules/cluster\"\n\n  providers = {\n    aws = aws\n  }\n\n  cluster_name = \"${var.environment}-eks\"\n  subnets      = var.subnet_ids\n\n  vpc_resolvers = [\n    {\n      ip       = \"8.8.8.8\"\n      type     = \"IPv4\"\n      search   = true\n      priority = 1\n    }\n  ]\n}\n\nmodule \"s3\" {\n  source = \"github.com/aws/terraform-modules/s3-bucket\"\n\n  providers = {\n    aws = aws\n  }\n\n  bucket_name = \"${var.environment}-s3\"\n  acl         = \"private\"\n\n  lifecycle {\n    ignore_changes = true\n  }\n}\n\nresource \"aws_eks_cluster\" \"this\" {\n  name     = module.eks.cluster_name\n  role_arn = aws_iam_role.this.arn\n\n  vpc_resolvers = [\n    {\n      ip       = \"8.8.8.8\"\n      type     = \"IPv4\"\n      search   = true\n      priority = 1\n    }\n  ]\n}\n\nresource \"aws_iam_role\" \"this\" {\n  name        = \"${var.environment}-eks-cluster-role\"\n  description = \"EKS cluster role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\",\n      \"Sid\": \"\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy_attachment\" \"this\" {\n  role       = aws_iam_role.this.name\n  policy_arn = \"arn:aws:iam::aws:policy/AmazonEKSClusterPolicy\"\n}\n\nresource \"aws_eks_node_group\" \"this\" {\n  cluster_name    = module.eks.cluster_name\n  node_group_name = \"${var.environment}-node-group\"\n  node_role_arn   = aws_iam_role.node.name\n\n  instance_types = [\"t3.small\"]\n  num_nodes      = 2\n}\n\nresource \"aws_iam_role\" \"node\" {\n  name        = \"${var.environment}-eks-node-role\"\n  description = \"EKS node role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\",\n      \"Sid\": \"\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy_attachment\" \"node\" {\n  role       = aws_iam_role.node.name\n  policy_arn = \"arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy\"\n}\n\nresource \"aws_s3_bucket\" \"this\" {\n  bucket = module.s3.bucket_name\n  acl    = \"private\"\n\n  lifecycle {\n    ignore_changes = true\n  }\n\n  tags = {\n    Environment = var.environment\n  }\n}\n\nresource \"aws_eks_cluster_config\" \"this\" {\n  cluster_name = aws_eks_cluster.this.name\n\n  lifecycle {\n    create_before_destroy = true\n  }\n}",
+    "timestamp": "2025-03-14T18:29:02.127310"
+  },
+  "b1a1606a-b910-4ad0-b489-771b2a99175e": {
+    "type": "infrastructure_generation",
+    "request": {
+      "task": "create a simple web application with EC2 and S3",
+      "requirements": {},
+      "cloud_provider": "aws",
+      "iac_type": "terraform"
+    },
+    "result": {
+      "task_id": "b1a1606a-b910-4ad0-b489-771b2a99175e",
+      "code": "`\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env_name\" {\n  type = string\n}\n\noutput \"ec2_instance_public_dns\" {\n  value = aws_instance.web.public_dns\n}\n\nresource \"aws_s3_bucket\" \"my_bucket\" {\n  bucket = \"my-web-app-bucket\"\n  acl    = \"private\"\n  server_side_encryption_configuration = {\n    rule = {\n      apply_server_side_encryption_by_default = {\n        sse_algorithm = \"AES256\"\n      }\n    }\n  }\n\n  policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicReadGetObject\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": \"s3:GetObject\",\n      \"Resource\": \"arn:aws:s3:::my-web-app-bucket/*\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = \"ami-abcd1234\"\n  instance_type = \"c5.large\"\n  vpc_security_group_ids = [aws_security_group.ec2.id]\n  key_name               = \"my_key\"\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_elastic_ip\" \"my_eip\" {\n  vpc_id         = aws_vpc.main.id\n  subnet_id      = aws_subnet.public.id\n\n  depends_on = [module.elastic_ip]\n}\n\nmodule \"elastic_ip\" {\n  source = \"terraform-aws-modules/elastic-ip/aws\"\n\n  name           = \"my-elastic-ip\"\n  vpc_id         = aws_vpc.main.id\n  subnet_ids     = [aws_subnet.public.id]\n}\n\nresource \"aws_autoscaling_group\" \"web\" {\n  name            = \"my-web-asg\"\n  max_size        = 2\n  min_size        = 1\n  desired_capacity = 1\n  vpc_zone_identifier = [aws_subnet.public.id]\n\n  lifecycle_hooks {\n    launch {\n      policy     = \"ALERT\"\n      notification_target_arn = aws_sns_topic.asg_notification.arn\n      notification_type     = \"AutoScalingThresholdCrossed\"\n    }\n  }\n\n  depends_on = [module.asg_notification]\n}\n\nmodule \"asg_notification\" {\n  source = \"terraform-aws-modules/sns-notification/aws\"\n\n  name            = \"my-asg-notification\"\n  topic_name      = \"my-asg-topic\"\n  sns_topic_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicReadGetObject\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": \"sns:GetTopicAttributes\",\n      \"Resource\": \"${aws_sns_topic.asg_notification.arn}\"\n    }\n  ]\n}\nEOF\n}\n\noutput \"bucket_arn\" {\n  value = aws_s3_bucket.my_bucket.arn\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_security_group\" \"ec2\" {\n  name        = \"ec2-web-sg\"\n  description = \"Allow inbound traffic on port 80 and 22\"\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n\n  egress {\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"${aws_instance.web.public_ip}/32\"]\n  }\n}",
+      "metadata": {
+        "resource_count": 5,
+        "module_count": 1,
+        "estimated_provisioning_time_minutes": 15,
+        "cloud_provider": "aws",
+        "generated_timestamp": 1741995411.5166495,
+        "similar_patterns_used": 0,
+        "similar_generations_used": 0,
+        "used_rag": false,
+        "architecture_findings": {
+          "reliability": [
+            {
+              "description": "No redundancy for EC2 instance",
+              "recommendation": "Consider using Auto Scaling or Elastic Load Balancer to ensure high availability and scalability"
+            }
+          ],
+          "security": [
+            {
+              "description": "Public read access on S3 bucket",
+              "recommendation": "Restrict public read access by setting the bucket's ACL to 'private' and granting specific users/groups access as needed"
+            },
+            {
+              "description": "Allowing inbound traffic from 0.0.0.0/0 on port 22 (SSH) is a security risk",
+              "recommendation": "Restrict SSH access to specific IP addresses or CIDR blocks using the Security Group rules or using AWS IAM roles"
+            }
+          ],
+          "cost_optimization": [
+            {
+              "description": "EC2 instance type (t2.micro) may not be optimized for production workloads",
+              "recommendation": "Consider using more powerful EC2 instance types, such as t3 or c5 instances, depending on the workload requirements"
+            },
+            {
+              "description": "S3 bucket is publically readable",
+              "recommendation": "Consider using server-side encryption and accessing S3 objects programmatically to reduce data transfer costs"
+            }
+          ],
+          "performance": [
+            {
+              "description": "EC2 instance is not optimized for performance (instance type, CPU utilization)",
+              "recommendation": "Monitor EC2 instance performance metrics and adjust instance types or configurations as needed to optimize performance"
+            },
+            {
+              "description": "No caching mechanism is implemented",
+              "recommendation": "Consider using Amazon ElastiCache or Amazon Elastic File System to improve performance by reducing database queries and caching frequently accessed data"
+            }
+          ],
+          "operational_excellence": [
+            {
+              "description": "Module 'elastic_ip' is not properly configured",
+              "recommendation": "Review the module configuration and ensure it meets the desired elastic IP allocation requirements"
+            },
+            {
+              "description": "No monitoring or logging is implemented for EC2 instances",
+              "recommendation": "Configure CloudWatch metrics and logs to monitor EC2 instance performance, errors, and security-related events"
+            }
+          ],
+          "critical_issues": [
+            {
+              "description": "Publicly readable S3 bucket with sensitive data",
+              "severity": "High"
+            }
+          ],
+          "recommendations": [
+            {
+              "description": "Implement redundancy for EC2 instances using Auto Scaling or Elastic Load Balancer",
+              "priority": "High"
+            },
+            {
+              "description": "Restrict public read access on S3 bucket and limit access to specific users/groups",
+              "priority": "Medium"
+            }
+          ]
+        },
+        "security_findings": {
+          "vulnerabilities": [
+            {
+              "severity": "high",
+              "title": "Unencrypted Storage for aws",
+              "description": "Storage resources are not configured with encryption",
+              "remediation": "Enable server-side encryption for all storage resources"
+            }
+          ],
+          "summary": {
+            "remediated_issues_count": 1,
+            "critical_issues_fixed": 1,
+            "issues_by_severity": {
+              "high": 1,
+              "medium": 0,
+              "low": 0
+            },
+            "summary": "Fixed 1 security issues (1 critical)"
+          },
+          "risk_score": 0,
+          "compliance_results": {}
+        }
+      },
+      "thoughts": "A great task! As an infrastructure_agent, I'll break down the steps to create a simple web application with EC2 and S3. Let's go through each step carefully.\n\n**1. What information do I need to complete this task?**\n\n* User requirements: What is the desired functionality of the web application? (e.g., what services will it provide, how many users are expected)\n* Infrastructure details:\n\t+ Region where the EC2 instance and S3 bucket should be created\n\t+ Instance type and configuration for the EC2 instance\n\t+ Storage and performance requirements for the S3 bucket\n\n**2. What are potential challenges or edge cases?**\n\n* Security: Ensure that the EC2 instance is properly secured with appropriate IAM roles and network configurations.\n* Scalability: Design the infrastructure to handle expected traffic and growth.\n* Cost optimization: Optimize resource utilization and costs by selecting the right instance types, storage options, and deployment strategies.\n\n**3. What best practices should I apply?**\n\n* Use Terraform for infrastructure as code (IaaS) management\n* Ensure proper IAM role creation and assignment for EC2 instances and S3 buckets\n* Utilize Ansible for configuration management of EC2 instances\n* Consider using Jenkins for continuous integration and deployment (CI/CD) pipelines\n\n**4. What is the optimal approach?**\n\nHere's a step-by-step approach to create a simple web application with EC2 and S3:\n\n1. **Create an AWS account and configure IAM**: Set up an AWS account, create an IAM user, and assign necessary permissions for infrastructure creation.\n2. **Use Terraform to define infrastructure as code**:\n\t* Define the EC2 instance type and configuration (e.g., t2.micro)\n\t* Create a Terraform script to provision the EC2 instance\n\t* Define the S3 bucket and its storage options (e.g., standard or infrequent access)\n\t* Use Terraform's `aws_s3_bucket` resource to create the S3 bucket\n3. **Deploy Ansible playbook for EC2 configuration**:\n\t* Create an Ansible playbook to configure the EC2 instance (e.g., install Apache, MySQL, and PHP)\n\t* Use Ansible's `ec2` module to connect to the EC2 instance and execute the playbook\n4. **Set up Jenkins CI/CD pipeline (optional)**:\n\t* Configure a Jenkins job to run Terraform and Ansible scripts\n\t* Define pipeline stages for code checkout, build, deploy, and testing\n5. **Monitor and manage infrastructure**:\n\t* Use Terraform's state file to track changes in the infrastructure\n\t* Utilize AWS CloudWatch and other monitoring tools to track performance and metrics\n\n**Capabilities at my disposal:**\n\nAs an infrastructure_agent, I can utilize the following capabilities:\n\n* `terraformation_generation`: Create a Terraform script for provisioning EC2 instances and S3 buckets.\n* `ansible_generation`: Generate Ansible playbooks for configuring EC2 instances.\n* `jenkins_generation`: Set up Jenkins CI/CD pipelines for automating deployments.\n* `infrastructure_analysis`: Analyze the infrastructure's performance, security, and scalability.\n* `cost_estimation`: Estimate costs based on resource utilization and deployment strategies.\n* `pattern_management`: Identify best practices and patterns in infrastructure design.\n\nBy following this approach, I can create a simple web application with EC2 and S3, ensuring scalability, security, and cost optimization.",
+      "architecture_findings": {
+        "reliability": [
+          {
+            "description": "No redundancy for EC2 instance",
+            "recommendation": "Consider using Auto Scaling or Elastic Load Balancer to ensure high availability and scalability"
+          }
+        ],
+        "security": [
+          {
+            "description": "Public read access on S3 bucket",
+            "recommendation": "Restrict public read access by setting the bucket's ACL to 'private' and granting specific users/groups access as needed"
+          },
+          {
+            "description": "Allowing inbound traffic from 0.0.0.0/0 on port 22 (SSH) is a security risk",
+            "recommendation": "Restrict SSH access to specific IP addresses or CIDR blocks using the Security Group rules or using AWS IAM roles"
+          }
+        ],
+        "cost_optimization": [
+          {
+            "description": "EC2 instance type (t2.micro) may not be optimized for production workloads",
+            "recommendation": "Consider using more powerful EC2 instance types, such as t3 or c5 instances, depending on the workload requirements"
+          },
+          {
+            "description": "S3 bucket is publically readable",
+            "recommendation": "Consider using server-side encryption and accessing S3 objects programmatically to reduce data transfer costs"
+          }
+        ],
+        "performance": [
+          {
+            "description": "EC2 instance is not optimized for performance (instance type, CPU utilization)",
+            "recommendation": "Monitor EC2 instance performance metrics and adjust instance types or configurations as needed to optimize performance"
+          },
+          {
+            "description": "No caching mechanism is implemented",
+            "recommendation": "Consider using Amazon ElastiCache or Amazon Elastic File System to improve performance by reducing database queries and caching frequently accessed data"
+          }
+        ],
+        "operational_excellence": [
+          {
+            "description": "Module 'elastic_ip' is not properly configured",
+            "recommendation": "Review the module configuration and ensure it meets the desired elastic IP allocation requirements"
+          },
+          {
+            "description": "No monitoring or logging is implemented for EC2 instances",
+            "recommendation": "Configure CloudWatch metrics and logs to monitor EC2 instance performance, errors, and security-related events"
+          }
+        ],
+        "critical_issues": [
+          {
+            "description": "Publicly readable S3 bucket with sensitive data",
+            "severity": "High"
+          }
+        ],
+        "recommendations": [
+          {
+            "description": "Implement redundancy for EC2 instances using Auto Scaling or Elastic Load Balancer",
+            "priority": "High"
+          },
+          {
+            "description": "Restrict public read access on S3 bucket and limit access to specific users/groups",
+            "priority": "Medium"
+          }
+        ]
+      },
+      "security_findings": {
+        "vulnerabilities": [
+          {
+            "severity": "high",
+            "title": "Unencrypted Storage for aws",
+            "description": "Storage resources are not configured with encryption",
+            "remediation": "Enable server-side encryption for all storage resources"
+          }
+        ],
+        "summary": {
+          "remediated_issues_count": 1,
+          "critical_issues_fixed": 1,
+          "issues_by_severity": {
+            "high": 1,
+            "medium": 0,
+            "low": 0
+          },
+          "summary": "Fixed 1 security issues (1 critical)"
+        },
+        "risk_score": 0,
+        "compliance_results": {}
+      },
+      "iac_type": "terraform",
+      "cloud_provider": "aws"
+    },
+    "original_code": "```\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env_name\" {\n  type = string\n}\n\noutput \"ec2_instance_public_dns\" {\n  value = aws_instance.web.public_dns\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = \"ami-abcd1234\"\n  instance_type = \"t2.micro\"\n  vpc_security_group_ids = [aws_security_group.ec2.id]\n  key_name               = \"my_key\"\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_security_group\" \"ec2\" {\n  name        = \"ec2-web-sg\"\n  description = \"Allow inbound traffic on port 80 and 22\"\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n\n  ingress {\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_s3_bucket\" \"my_bucket\" {\n  bucket = \"my-web-app-bucket\"\n  acl    = \"public\"\n\n  policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicReadGetObject\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": \"s3:GetObject\",\n      \"Resource\": \"arn:aws:s3:::my-web-app-bucket/*\"\n    }\n  ]\n}\nEOF\n}\n\noutput \"bucket_arn\" {\n  value = aws_s3_bucket.my_bucket.arn\n}\n\nmodule \"elastic_ip\" {\n  source = \"terraform-aws-modules/elastic-ip/aws\"\n\n  name           = \"my-elastic-ip\"\n  vpc_id         = aws_vpc.main.id\n  subnet_ids     = [aws_subnet.public.id]\n}\n```",
+    "improved_code": "provider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env_name\" {\n  type = string\n}\n\noutput \"ec2_instance_public_dns\" {\n  value = aws_instance.web.public_dns\n}\n\nresource \"aws_s3_bucket\" \"my_bucket\" {\n  bucket = \"my-web-app-bucket\"\n  acl    = \"private\"\n\n  policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicReadGetObject\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": \"s3:GetObject\",\n      \"Resource\": \"arn:aws:s3:::my-web-app-bucket/*\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = \"ami-abcd1234\"\n  instance_type = \"c5.large\"\n  vpc_security_group_ids = [aws_security_group.ec2.id]\n  key_name               = \"my_key\"\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_elastic_ip\" \"my_eip\" {\n  vpc_id         = aws_vpc.main.id\n  subnet_id      = aws_subnet.public.id\n\n  depends_on = [module.elastic_ip]\n}\n\nmodule \"elastic_ip\" {\n  source = \"terraform-aws-modules/elastic-ip/aws\"\n\n  name           = \"my-elastic-ip\"\n  vpc_id         = aws_vpc.main.id\n  subnet_ids     = [aws_subnet.public.id]\n}\n\nresource \"aws_autoscaling_group\" \"web\" {\n  name            = \"my-web-asg\"\n  max_size        = 2\n  min_size        = 1\n  desired_capacity = 1\n  vpc_zone_identifier = [aws_subnet.public.id]\n\n  lifecycle_hooks {\n    launch {\n      policy     = \"ALERT\"\n      notification_target_arn = aws_sns_topic.asg_notification.arn\n      notification_type     = \"AutoScalingThresholdCrossed\"\n    }\n  }\n\n  depends_on = [module.asg_notification]\n}\n\nmodule \"asg_notification\" {\n  source = \"terraform-aws-modules/sns-notification/aws\"\n\n  name            = \"my-asg-notification\"\n  topic_name      = \"my-asg-topic\"\n  sns_topic_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicReadGetObject\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": \"sns:GetTopicAttributes\",\n      \"Resource\": \"${aws_sns_topic.asg_notification.arn}\"\n    }\n  ]\n}\nEOF\n}\n\noutput \"bucket_arn\" {\n  value = aws_s3_bucket.my_bucket.arn\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_security_group\" \"ec2\" {\n  name        = \"ec2-web-sg\"\n  description = \"Allow inbound traffic on port 80 and 22\"\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n\n  egress {\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"${aws_instance.web.public_ip}/32\"]\n  }\n}",
+    "secured_code": "`\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env_name\" {\n  type = string\n}\n\noutput \"ec2_instance_public_dns\" {\n  value = aws_instance.web.public_dns\n}\n\nresource \"aws_s3_bucket\" \"my_bucket\" {\n  bucket = \"my-web-app-bucket\"\n  acl    = \"private\"\n  server_side_encryption_configuration = {\n    rule = {\n      apply_server_side_encryption_by_default = {\n        sse_algorithm = \"AES256\"\n      }\n    }\n  }\n\n  policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicReadGetObject\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": \"s3:GetObject\",\n      \"Resource\": \"arn:aws:s3:::my-web-app-bucket/*\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_instance\" \"web\" {\n  ami           = \"ami-abcd1234\"\n  instance_type = \"c5.large\"\n  vpc_security_group_ids = [aws_security_group.ec2.id]\n  key_name               = \"my_key\"\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_elastic_ip\" \"my_eip\" {\n  vpc_id         = aws_vpc.main.id\n  subnet_id      = aws_subnet.public.id\n\n  depends_on = [module.elastic_ip]\n}\n\nmodule \"elastic_ip\" {\n  source = \"terraform-aws-modules/elastic-ip/aws\"\n\n  name           = \"my-elastic-ip\"\n  vpc_id         = aws_vpc.main.id\n  subnet_ids     = [aws_subnet.public.id]\n}\n\nresource \"aws_autoscaling_group\" \"web\" {\n  name            = \"my-web-asg\"\n  max_size        = 2\n  min_size        = 1\n  desired_capacity = 1\n  vpc_zone_identifier = [aws_subnet.public.id]\n\n  lifecycle_hooks {\n    launch {\n      policy     = \"ALERT\"\n      notification_target_arn = aws_sns_topic.asg_notification.arn\n      notification_type     = \"AutoScalingThresholdCrossed\"\n    }\n  }\n\n  depends_on = [module.asg_notification]\n}\n\nmodule \"asg_notification\" {\n  source = \"terraform-aws-modules/sns-notification/aws\"\n\n  name            = \"my-asg-notification\"\n  topic_name      = \"my-asg-topic\"\n  sns_topic_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"PublicReadGetObject\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Action\": \"sns:GetTopicAttributes\",\n      \"Resource\": \"${aws_sns_topic.asg_notification.arn}\"\n    }\n  ]\n}\nEOF\n}\n\noutput \"bucket_arn\" {\n  value = aws_s3_bucket.my_bucket.arn\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_security_group\" \"ec2\" {\n  name        = \"ec2-web-sg\"\n  description = \"Allow inbound traffic on port 80 and 22\"\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n\n  egress {\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"${aws_instance.web.public_ip}/32\"]\n  }\n}",
+    "timestamp": "2025-03-14T23:37:39.305157"
+  },
+  "db021e13-9d83-4b7e-8d20-8c4a66b25e7f": {
+    "type": "infrastructure_generation",
+    "request": {
+      "task": "create a sample wordpress application with EKS and RDS",
+      "requirements": {},
+      "cloud_provider": "aws",
+      "iac_type": "terraform"
+    },
+    "result": {
+      "task_id": "db021e13-9d83-4b7e-8d20-8c4a66b25e7f",
+      "code": "```terraform\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env_name\" {\n  type = string\n}\n\nvariable \"eks_cluster_name\" {\n  type = string\n}\n\nvariable \"rds_instance_type\" {\n  type = string\n}\n\noutput \"eks_cluster_endpoint\" {\n  value = aws_eks_cluster.main.endpoint\n}\n\noutput \"rds_instance_address\" {\n  value = aws_db_instance.rds.address\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_subnet\" \"private\" {\n  cidr_block = \"10.0.2.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_eks_cluster\" \"main\" {\n  name     = var.eks_cluster_name\n  role_arn = aws_iam_role.eks_cluster.arn\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_iam_role\" \"eks_cluster\" {\n  name        = \"${var.eks_cluster_name}-cluster\"\n  description = \"EKS cluster role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"eks.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy\" \"eks_cluster\" {\n  name        = \"${var.eks_cluster_name}-cluster-policy\"\n  role        = aws_iam_role.eks_cluster.id\n\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"ec2:DescribeInstances\",\n      \"Resource\": \"*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_eks_node_group\" \"main\" {\n  cluster_name    = aws_eks_cluster.main.name\n  node_group_name = \"${var.eks_cluster_name}-node-group\"\n  node_role_arn   = aws_iam_role.node.arn\n\n  scaling_config {\n    desired_size = 2\n    max_size     = 2\n    min_size     = 1\n  }\n}\n\nresource \"aws_iam_role\" \"node\" {\n  name        = \"${var.eks_cluster_name}-node\"\n  description = \"EKS node role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy\" \"node\" {\n  name        = \"${var.eks_cluster_name}-node-policy\"\n  role        = aws_iam_role.node.id\n\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"ec2:DescribeInstances\",\n      \"Resource\": \"*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_db_subnet_group\" \"main\" {\n  name        = \"${var.env_name}-db-subnet-group\"\n  description = \"RDS subnet group\"\n\n  subnet_ids = [aws_subnet.private.id]\n}\n\nresource \"aws_rds_instance\" \"rds\" {\n  allocated_storage    = 20\n  engine               = \"mysql\"\n  instance_class       = var.rds_instance_type\n  username            = \"admin\"\n  password           = \"password1234\"\n\n  db_subnet_group_name = aws_db_subnet_group.main.name\n\n  vpc_security_group_ids = [aws_security_group.rds.id]\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_security_group\" \"rds\" {\n  name        = \"${var.env_name}-rds-sg\"\n  description = \"RDS security group\"\n\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 3306\n    to_port     = 3306\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_eks_pod\" \"wordpress\" {\n  cluster_name    = aws_eks_cluster.main.name\n  node_group_name = aws_eks_node_group.main.node_group_name\n\n  container {\n    image      = \"wordpress:latest\"\n    name       = \"wordpress\"\n    portMappings {\n      container_port = 80\n      host_port      = 80\n    }\n  }\n}\n\nresource \"aws_eks_service\" \"wordpress\" {\n  cluster_name    = aws_eks_cluster.main.name\n  namespace_name = \"default\"\n\n  service_type = \"LoadBalancer\"\n\n  selector = {\n    app = \"wordpress\"\n  }\n\n  port = {\n    name   = \"http\"\n    number = 80\n  }\n}\n```",
+      "metadata": {
+        "resource_count": 14,
+        "module_count": 0,
+        "estimated_provisioning_time_minutes": 28,
+        "cloud_provider": "aws",
+        "generated_timestamp": 1741996562.322836,
+        "similar_patterns_used": 0,
+        "similar_generations_used": 1,
+        "used_rag": true,
+        "architecture_findings": {
+          "reliability": [
+            {
+              "issue": "The VPC and subnets are not duplicated across regions",
+              "description": "The AWS Well-Architected Framework recommends having multiple Availability Zones (AZs) for reliability. This code only has one AZ.",
+              "recommendation": "Create identical VPCs and subnets in additional AZs."
+            }
+          ],
+          "security": [
+            {
+              "issue": "Ingress rule allows access to RDS from all IP addresses",
+              "description": "The ingress rule for the RDS security group allows access from any IP address. This could be a security vulnerability.",
+              "recommendation": "Restrict ingress rules to only allow access from specific IP addresses or CIDR blocks."
+            },
+            {
+              "issue": "No encryption is enabled for the RDS instance",
+              "description": "The AWS Well-Architected Framework recommends enabling encryption for all data at rest and in transit. This code does not enable encryption.",
+              "recommendation": "Enable encryption for the RDS instance."
+            }
+          ],
+          "cost_optimization": [
+            {
+              "issue": "Unused resources are being created",
+              "description": "The code creates multiple IAM roles, policies, and security groups that may not be used. This can lead to unnecessary costs.",
+              "recommendation": "Review and remove unused resources."
+            }
+          ],
+          "performance": [
+            {
+              "issue": "Insufficient instance types for RDS",
+              "description": "The code uses a small instance type for the RDS instance, which may not be sufficient for performance needs.",
+              "recommendation": "Choose more powerful instance types for the RDS instance."
+            }
+          ],
+          "operational_excellence": [
+            {
+              "issue": "No monitoring or logging is enabled",
+              "description": "The AWS Well-Architected Framework recommends enabling monitoring and logging to detect and troubleshoot issues. This code does not enable monitoring or logging.",
+              "recommendation": "Enable monitoring and logging for the resources created in this code."
+            }
+          ]
+        },
+        "security_findings": {
+          "vulnerabilities": [
+            {
+              "severity": "high",
+              "title": "Unencrypted Storage for RDS",
+              "description": "Storage resources are not configured with encryption",
+              "remediation": "Enable server-side encryption for all storage resources"
+            },
+            {
+              "severity": "high",
+              "title": "Publicly Accessible RDS Instance",
+              "description": "The RDS instance is publicly accessible, leaving it vulnerable to unauthorized access",
+              "remediation": "Restrict access to the RDS instance by updating the security group rules"
+            },
+            {
+              "severity": "high",
+              "title": "Unencrypted Storage for aws",
+              "description": "Storage resources are not configured with encryption",
+              "remediation": "Enable server-side encryption for all storage resources"
+            },
+            {
+              "severity": "medium",
+              "title": "Insecure EKS Cluster Role",
+              "description": "The EKS cluster role does not have a suitable policy attached, making it vulnerable to unauthorized use",
+              "remediation": "Attach a suitable policy to the EKS cluster role"
+            },
+            {
+              "severity": "medium",
+              "title": "Unsecured EKS Node Role",
+              "description": "The EKS node role does not have a suitable policy attached, making it vulnerable to unauthorized use",
+              "remediation": "Attach a suitable policy to the EKS node role"
+            }
+          ],
+          "summary": {
+            "remediated_issues_count": 0,
+            "summary": "Remediation failed to produce valid code"
+          },
+          "risk_score": 0,
+          "compliance_results": {
+            "CIS AWS Benchmark": [
+              "VPC and subnet configuration is not compliant with CIS AWS Benchmark",
+              "RDS instance security is not compliant with CIS AWS Benchmark",
+              "IAM role management is not compliant with CIS AWS Benchmark"
+            ],
+            "AWS Well-Architected Security Pillar": [
+              "Identity and access management is not compliant with AWS Well-Architected Security Pillar",
+              "Data protection is not compliant with AWS Well-Architected Security Pillar",
+              "Network security is not compliant with AWS Well-Architected Security Pillar"
+            ]
+          }
+        }
+      },
+      "thoughts": "As an infrastructure_agent responsible for generating infrastructure as code based on user requirements, let's break down the task of creating a sample WordPress application with EKS and RDS. Here are my thoughts:\n\n**Task: Create a sample WordPress application with EKS and RDS**\n\n**1. What information do I need to complete this task?**\n\n* User requirements:\n\t+ Desired functionality of the WordPress application (e.g., blogging, e-commerce)\n\t+ Number of users or expected traffic\n\t+ Storage requirements for WordPress files and databases\n\t+ Any specific security or compliance requirements\n* Existing infrastructure: Is there a existing VPC, subnet, or other AWS resources that need to be leveraged?\n* Desired scalability and high availability requirements\n\n**2. What are potential challenges or edge cases?**\n\n* EKS cluster setup and configuration (e.g., node groups, scaling)\n* RDS instance type selection and performance optimization\n* WordPress configuration and customization (e.g., theme, plugins)\n* Security group and network ACL configurations to ensure proper access and isolation\n* Potential issues with DNS resolution and load balancing\n\n**3. What best practices should I apply?**\n\n* Use IAM roles and policies for secure authentication and authorization\n* Implement a CI/CD pipeline using Jenkins or other tools for automated testing, building, and deployment\n* Utilize Terraform or another infrastructure-as-code tool to manage and version the infrastructure configuration files\n* Ensure proper monitoring and logging setup for the application and infrastructure\n\n**4. What is the optimal approach?**\n\n* Start by setting up a VPC, subnets, and security groups for isolation and access control\n* Create an EKS cluster with desired node groups and scaling configurations\n* Set up an RDS instance with suitable storage and performance settings\n* Deploy WordPress to the EKS cluster using Ansible or other automation tools\n* Configure DNS resolution and load balancing as needed\n* Implement a CI/CD pipeline for automated testing, building, and deployment\n\nCapabilities at my disposal:\n\n* Terraform_generation: Use this capability to generate infrastructure-as-code files (e.g., AWS provider configuration)\n* Ansible_generation: Leverage this capability to automate the deployment of WordPress and other components to the EKS cluster\n* Jenkins_generation: Utilize this capability to set up a CI/CD pipeline for automated testing, building, and deployment\n* Infrastructure_analysis: Analyze existing infrastructure and identify potential issues or areas for optimization\n* Cost_estimation: Estimate the costs associated with the proposed infrastructure configuration\n* Pattern_management: Use this capability to manage and version the infrastructure configuration files using patterns and best practices\n\nWith these capabilities at my disposal, I'm ready to generate the sample WordPress application with EKS and RDS!",
+      "architecture_findings": {
+        "reliability": [
+          {
+            "issue": "The VPC and subnets are not duplicated across regions",
+            "description": "The AWS Well-Architected Framework recommends having multiple Availability Zones (AZs) for reliability. This code only has one AZ.",
+            "recommendation": "Create identical VPCs and subnets in additional AZs."
+          }
+        ],
+        "security": [
+          {
+            "issue": "Ingress rule allows access to RDS from all IP addresses",
+            "description": "The ingress rule for the RDS security group allows access from any IP address. This could be a security vulnerability.",
+            "recommendation": "Restrict ingress rules to only allow access from specific IP addresses or CIDR blocks."
+          },
+          {
+            "issue": "No encryption is enabled for the RDS instance",
+            "description": "The AWS Well-Architected Framework recommends enabling encryption for all data at rest and in transit. This code does not enable encryption.",
+            "recommendation": "Enable encryption for the RDS instance."
+          }
+        ],
+        "cost_optimization": [
+          {
+            "issue": "Unused resources are being created",
+            "description": "The code creates multiple IAM roles, policies, and security groups that may not be used. This can lead to unnecessary costs.",
+            "recommendation": "Review and remove unused resources."
+          }
+        ],
+        "performance": [
+          {
+            "issue": "Insufficient instance types for RDS",
+            "description": "The code uses a small instance type for the RDS instance, which may not be sufficient for performance needs.",
+            "recommendation": "Choose more powerful instance types for the RDS instance."
+          }
+        ],
+        "operational_excellence": [
+          {
+            "issue": "No monitoring or logging is enabled",
+            "description": "The AWS Well-Architected Framework recommends enabling monitoring and logging to detect and troubleshoot issues. This code does not enable monitoring or logging.",
+            "recommendation": "Enable monitoring and logging for the resources created in this code."
+          }
+        ]
+      },
+      "security_findings": {
+        "vulnerabilities": [
+          {
+            "severity": "high",
+            "title": "Unencrypted Storage for RDS",
+            "description": "Storage resources are not configured with encryption",
+            "remediation": "Enable server-side encryption for all storage resources"
+          },
+          {
+            "severity": "high",
+            "title": "Publicly Accessible RDS Instance",
+            "description": "The RDS instance is publicly accessible, leaving it vulnerable to unauthorized access",
+            "remediation": "Restrict access to the RDS instance by updating the security group rules"
+          },
+          {
+            "severity": "high",
+            "title": "Unencrypted Storage for aws",
+            "description": "Storage resources are not configured with encryption",
+            "remediation": "Enable server-side encryption for all storage resources"
+          },
+          {
+            "severity": "medium",
+            "title": "Insecure EKS Cluster Role",
+            "description": "The EKS cluster role does not have a suitable policy attached, making it vulnerable to unauthorized use",
+            "remediation": "Attach a suitable policy to the EKS cluster role"
+          },
+          {
+            "severity": "medium",
+            "title": "Unsecured EKS Node Role",
+            "description": "The EKS node role does not have a suitable policy attached, making it vulnerable to unauthorized use",
+            "remediation": "Attach a suitable policy to the EKS node role"
+          }
+        ],
+        "summary": {
+          "remediated_issues_count": 0,
+          "summary": "Remediation failed to produce valid code"
+        },
+        "risk_score": 0,
+        "compliance_results": {
+          "CIS AWS Benchmark": [
+            "VPC and subnet configuration is not compliant with CIS AWS Benchmark",
+            "RDS instance security is not compliant with CIS AWS Benchmark",
+            "IAM role management is not compliant with CIS AWS Benchmark"
+          ],
+          "AWS Well-Architected Security Pillar": [
+            "Identity and access management is not compliant with AWS Well-Architected Security Pillar",
+            "Data protection is not compliant with AWS Well-Architected Security Pillar",
+            "Network security is not compliant with AWS Well-Architected Security Pillar"
+          ]
+        }
+      },
+      "iac_type": "terraform",
+      "cloud_provider": "aws"
+    },
+    "original_code": "```terraform\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env_name\" {\n  type = string\n}\n\nvariable \"eks_cluster_name\" {\n  type = string\n}\n\nvariable \"rds_instance_type\" {\n  type = string\n}\n\noutput \"eks_cluster_endpoint\" {\n  value = aws_eks_cluster.main.endpoint\n}\n\noutput \"rds_instance_address\" {\n  value = aws_db_instance.rds.address\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_subnet\" \"private\" {\n  cidr_block = \"10.0.2.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_eks_cluster\" \"main\" {\n  name     = var.eks_cluster_name\n  role_arn = aws_iam_role.eks_cluster.arn\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_iam_role\" \"eks_cluster\" {\n  name        = \"${var.eks_cluster_name}-cluster\"\n  description = \"EKS cluster role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"eks.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy\" \"eks_cluster\" {\n  name        = \"${var.eks_cluster_name}-cluster-policy\"\n  role        = aws_iam_role.eks_cluster.id\n\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"ec2:DescribeInstances\",\n      \"Resource\": \"*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_eks_node_group\" \"main\" {\n  cluster_name    = aws_eks_cluster.main.name\n  node_group_name = \"${var.eks_cluster_name}-node-group\"\n  node_role_arn   = aws_iam_role.node.arn\n\n  scaling_config {\n    desired_size = 2\n    max_size     = 2\n    min_size     = 1\n  }\n}\n\nresource \"aws_iam_role\" \"node\" {\n  name        = \"${var.eks_cluster_name}-node\"\n  description = \"EKS node role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy\" \"node\" {\n  name        = \"${var.eks_cluster_name}-node-policy\"\n  role        = aws_iam_role.node.id\n\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"ec2:DescribeInstances\",\n      \"Resource\": \"*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_db_subnet_group\" \"main\" {\n  name        = \"${var.env_name}-db-subnet-group\"\n  description = \"RDS subnet group\"\n\n  subnet_ids = [aws_subnet.private.id]\n}\n\nresource \"aws_rds_instance\" \"rds\" {\n  allocated_storage    = 20\n  engine               = \"mysql\"\n  instance_class       = var.rds_instance_type\n  username            = \"admin\"\n  password           = \"password1234\"\n\n  db_subnet_group_name = aws_db_subnet_group.main.name\n\n  vpc_security_group_ids = [aws_security_group.rds.id]\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_security_group\" \"rds\" {\n  name        = \"${var.env_name}-rds-sg\"\n  description = \"RDS security group\"\n\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 3306\n    to_port     = 3306\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_eks_pod\" \"wordpress\" {\n  cluster_name    = aws_eks_cluster.main.name\n  node_group_name = aws_eks_node_group.main.node_group_name\n\n  container {\n    image      = \"wordpress:latest\"\n    name       = \"wordpress\"\n    portMappings {\n      container_port = 80\n      host_port      = 80\n    }\n  }\n}\n\nresource \"aws_eks_service\" \"wordpress\" {\n  cluster_name    = aws_eks_cluster.main.name\n  namespace_name = \"default\"\n\n  service_type = \"LoadBalancer\"\n\n  selector = {\n    app = \"wordpress\"\n  }\n\n  port = {\n    name   = \"http\"\n    number = 80\n  }\n}\n```",
+    "improved_code": "```terraform\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env_name\" {\n  type = string\n}\n\nvariable \"eks_cluster_name\" {\n  type = string\n}\n\nvariable \"rds_instance_type\" {\n  type = string\n}\n\noutput \"eks_cluster_endpoint\" {\n  value = aws_eks_cluster.main.endpoint\n}\n\noutput \"rds_instance_address\" {\n  value = aws_db_instance.rds.address\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_subnet\" \"private\" {\n  cidr_block = \"10.0.2.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_eks_cluster\" \"main\" {\n  name     = var.eks_cluster_name\n  role_arn = aws_iam_role.eks_cluster.arn\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_iam_role\" \"eks_cluster\" {\n  name        = \"${var.eks_cluster_name}-cluster\"\n  description = \"EKS cluster role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"eks.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy\" \"eks_cluster\" {\n  name        = \"${var.eks_cluster_name}-cluster-policy\"\n  role        = aws_iam_role.eks_cluster.id\n\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"ec2:DescribeInstances\",\n      \"Resource\": \"*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_eks_node_group\" \"main\" {\n  cluster_name    = aws_eks_cluster.main.name\n  node_group_name = \"${var.eks_cluster_name}-node-group\"\n  node_role_arn   = aws_iam_role.node.arn\n\n  scaling_config {\n    desired_size = 2\n    max_size     = 2\n    min_size     = 1\n  }\n}\n\nresource \"aws_iam_role\" \"node\" {\n  name        = \"${var.eks_cluster_name}-node\"\n  description = \"EKS node role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy\" \"node\" {\n  name        = \"${var.eks_cluster_name}-node-policy\"\n  role        = aws_iam_role.node.id\n\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"ec2:DescribeInstances\",\n      \"Resource\": \"*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_db_subnet_group\" \"main\" {\n  name        = \"${var.env_name}-db-subnet-group\"\n  description = \"RDS subnet group\"\n\n  subnet_ids = [aws_subnet.private.id]\n}\n\nresource \"aws_rds_instance\" \"rds\" {\n  allocated_storage    = 20\n  engine               = \"mysql\"\n  instance_class       = var.rds_instance_type\n  username            = \"admin\"\n  password           = \"password1234\"\n\n  db_subnet_group_name = aws_db_subnet_group.main.name\n\n  vpc_security_group_ids = [aws_security_group.rds.id]\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_security_group\" \"rds\" {\n  name        = \"${var.env_name}-rds-sg\"\n  description = \"RDS security group\"\n\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 3306\n    to_port     = 3306\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_eks_pod\" \"wordpress\" {\n  cluster_name    = aws_eks_cluster.main.name\n  node_group_name = aws_eks_node_group.main.node_group_name\n\n  container {\n    image      = \"wordpress:latest\"\n    name       = \"wordpress\"\n    portMappings {\n      container_port = 80\n      host_port      = 80\n    }\n  }\n}\n\nresource \"aws_eks_service\" \"wordpress\" {\n  cluster_name    = aws_eks_cluster.main.name\n  namespace_name = \"default\"\n\n  service_type = \"LoadBalancer\"\n\n  selector = {\n    app = \"wordpress\"\n  }\n\n  port = {\n    name   = \"http\"\n    number = 80\n  }\n}\n```",
+    "secured_code": "```terraform\nprovider \"aws\" {\n  region = \"us-west-2\"\n}\n\nvariable \"env_name\" {\n  type = string\n}\n\nvariable \"eks_cluster_name\" {\n  type = string\n}\n\nvariable \"rds_instance_type\" {\n  type = string\n}\n\noutput \"eks_cluster_endpoint\" {\n  value = aws_eks_cluster.main.endpoint\n}\n\noutput \"rds_instance_address\" {\n  value = aws_db_instance.rds.address\n}\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block = \"10.0.0.0/16\"\n}\n\nresource \"aws_subnet\" \"public\" {\n  cidr_block = \"10.0.1.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_subnet\" \"private\" {\n  cidr_block = \"10.0.2.0/24\"\n  vpc_id     = aws_vpc.main.id\n  availability_zone = \"us-west-2a\"\n}\n\nresource \"aws_eks_cluster\" \"main\" {\n  name     = var.eks_cluster_name\n  role_arn = aws_iam_role.eks_cluster.arn\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_iam_role\" \"eks_cluster\" {\n  name        = \"${var.eks_cluster_name}-cluster\"\n  description = \"EKS cluster role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"eks.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy\" \"eks_cluster\" {\n  name        = \"${var.eks_cluster_name}-cluster-policy\"\n  role        = aws_iam_role.eks_cluster.id\n\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"ec2:DescribeInstances\",\n      \"Resource\": \"*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_eks_node_group\" \"main\" {\n  cluster_name    = aws_eks_cluster.main.name\n  node_group_name = \"${var.eks_cluster_name}-node-group\"\n  node_role_arn   = aws_iam_role.node.arn\n\n  scaling_config {\n    desired_size = 2\n    max_size     = 2\n    min_size     = 1\n  }\n}\n\nresource \"aws_iam_role\" \"node\" {\n  name        = \"${var.eks_cluster_name}-node\"\n  description = \"EKS node role\"\n\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"ec2.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_iam_role_policy\" \"node\" {\n  name        = \"${var.eks_cluster_name}-node-policy\"\n  role        = aws_iam_role.node.id\n\n  policy      = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"ec2:DescribeInstances\",\n      \"Resource\": \"*\",\n      \"Effect\": \"Allow\"\n    }\n  ]\n}\nEOF\n}\n\nresource \"aws_db_subnet_group\" \"main\" {\n  name        = \"${var.env_name}-db-subnet-group\"\n  description = \"RDS subnet group\"\n\n  subnet_ids = [aws_subnet.private.id]\n}\n\nresource \"aws_rds_instance\" \"rds\" {\n  allocated_storage    = 20\n  engine               = \"mysql\"\n  instance_class       = var.rds_instance_type\n  username            = \"admin\"\n  password           = \"password1234\"\n\n  db_subnet_group_name = aws_db_subnet_group.main.name\n\n  vpc_security_group_ids = [aws_security_group.rds.id]\n\n  tags = {\n    Environment = var.env_name\n  }\n}\n\nresource \"aws_security_group\" \"rds\" {\n  name        = \"${var.env_name}-rds-sg\"\n  description = \"RDS security group\"\n\n  vpc_id      = aws_vpc.main.id\n\n  ingress {\n    from_port   = 3306\n    to_port     = 3306\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}\n\nresource \"aws_eks_pod\" \"wordpress\" {\n  cluster_name    = aws_eks_cluster.main.name\n  node_group_name = aws_eks_node_group.main.node_group_name\n\n  container {\n    image      = \"wordpress:latest\"\n    name       = \"wordpress\"\n    portMappings {\n      container_port = 80\n      host_port      = 80\n    }\n  }\n}\n\nresource \"aws_eks_service\" \"wordpress\" {\n  cluster_name    = aws_eks_cluster.main.name\n  namespace_name = \"default\"\n\n  service_type = \"LoadBalancer\"\n\n  selector = {\n    app = \"wordpress\"\n  }\n\n  port = {\n    name   = \"http\"\n    number = 80\n  }\n}\n```",
+    "timestamp": "2025-03-14T23:56:49.217641"
   }
 }

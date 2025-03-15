@@ -1,5 +1,4 @@
 version: '3.8'
-
 services:
   # Core API service
   api:
@@ -35,7 +34,17 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-
+    # Add this for GPU support
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    # Make GPU runtime optional
+    runtime: ${GPU_RUNTIME:-runc}
+    
   # React UI service
   react-ui:
     build:
@@ -52,7 +61,7 @@ services:
     restart: unless-stopped
     environment:
       - REACT_APP_API_URL=http://192.168.5.199:8000
-
+      
   # Test service for running automated tests
   test:
     build:
@@ -80,7 +89,7 @@ services:
 networks:
   infra_network:
     driver: bridge
-
+    
 volumes:
   chroma_data:
     driver: local
